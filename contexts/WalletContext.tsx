@@ -12,6 +12,7 @@ interface WalletContextType {
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
+console.log("WalletContext:", WalletContext)
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [isConnected, setIsConnected] = useState(false)
@@ -67,6 +68,6 @@ export function useWallet() {
   if (context === undefined) {
     throw new Error("useWallet must be used within a WalletProvider")
   }
+  console.log("useWallet:", useWallet)
   return context
 }
-

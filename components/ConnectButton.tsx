@@ -1,12 +1,22 @@
 "use client"
 
+"use client"
+
 import { Button } from "@/components/ui/button"
-import { useWallet } from "@/contexts/WalletContext"
 import { Loader2 } from "lucide-react"
 import { useState } from "react"
 
-export function ConnectButton() {
-  const { isConnected, connect, disconnect, account } = useWallet()
+interface ConnectButtonProps {
+  isConnected: boolean
+  connect: () => Promise<void>
+  disconnect: () => void
+}
+
+export function ConnectButton({
+  isConnected,
+  connect,
+  disconnect,
+}: ConnectButtonProps) {
   const [isConnecting, setIsConnecting] = useState(false)
 
   const handleConnect = async () => {
@@ -20,10 +30,13 @@ export function ConnectButton() {
     }
   }
 
-  if (isConnected && account) {
+  if (isConnected) {
     return (
-      <Button onClick={disconnect} className="bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
-        {`${account.slice(0, 6)}...${account.slice(-4)}`}
+      <Button
+        onClick={disconnect}
+        className="bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+      >
+        Disconnect
       </Button>
     )
   }
@@ -45,4 +58,3 @@ export function ConnectButton() {
     </Button>
   )
 }
-

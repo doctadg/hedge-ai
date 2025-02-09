@@ -1,6 +1,8 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useDashboardAccess } from "@/hooks/useDashboardAccess"
+import { PremiumModal } from "@/components/ui/PremiumModal"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
 
 const data = [
@@ -13,8 +15,24 @@ const data = [
 const COLORS = ["#22c55e", "#3b82f6", "#f59e0b", "#8b5cf6"]
 
 export default function AllocationsPage() {
+  const { isPremium } = useDashboardAccess()
+
   return (
     <div className="space-y-6">
+      {!isPremium ? (
+        <PremiumModal>
+          <Content />
+        </PremiumModal>
+      ) : (
+        <Content />
+      )}
+    </div>
+  )
+}
+
+function Content() {
+  return (
+    <>
       <h1 className="text-2xl font-bold text-white">Portfolio Allocations</h1>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -26,9 +44,20 @@ export default function AllocationsPage() {
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={data} cx="50%" cy="50%" labelLine={false} outerRadius={100} fill="#8884d8" dataKey="value">
+                  <Pie
+                    data={data}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
                     {data.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
                     ))}
                   </Pie>
                   <Tooltip
@@ -83,7 +112,6 @@ export default function AllocationsPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </>
   )
 }
-

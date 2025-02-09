@@ -2,6 +2,9 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 
+import { ThemeProvider } from "@/components/theme-provider"
+import { WalletProvider } from "@/contexts/WalletContext"
+
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
@@ -16,8 +19,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <WalletProvider>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+          <body className={inter.className}>{children}</body>
+        </ThemeProvider>
+      </WalletProvider>
     </html>
   )
 }
-

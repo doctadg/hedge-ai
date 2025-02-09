@@ -32,7 +32,7 @@ async function fetchData(endpoint: string, params: Record<string, string> = {}) 
 }
 
 export async function fetchGlobalData() {
-  return fetchData("global")
+  return fetchData("global");
 }
 
 export async function fetchTrendingCoins() {
@@ -44,12 +44,8 @@ export async function fetchTopCoins() {
   return fetchData("top")
 }
 
-export async function fetchGlobalDefiData() {
-  return fetchData("defi")
-}
-
-export async function fetchCoinData(coinId: string) {
-  return fetchData("coin", { coinId })
+export async function fetchCoinData() {
+  return fetchData("coin");
 }
 
 export async function fetchMarketChart(coinId: string, days: string) {
@@ -98,3 +94,6 @@ export async function fetchDerivativesExchanges() {
   return handleApiResponse(response)
 }
 
+export async function fetchGlobalDefiData() {
+  return fetchData("defi")
+}

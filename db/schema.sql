@@ -1,0 +1,5 @@
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  wallet_address VARCHAR(255) UNIQUE NOT NULL,
+  is_premium BOOLEAN DEFAULT FALSE
+);

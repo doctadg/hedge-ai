@@ -1,60 +1,121 @@
 "use client"
 
-import { Card } from "@/components/ui/card"
-import { useEffect, useState } from "react"
-import { fetchCoinData, fetchGlobalData, fetchCoinMarkets } from "@/utils/api"
+import { Card } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+
+interface Metric {
+  label: string;
+  value: string;
+  className?: string;
+}
 
 export function DashboardMetrics() {
-  const [metrics, setMetrics] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [metrics, setMetrics] = useState<Metric[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
-      setLoading(true)
+      setLoading(true);
       try {
-        const [bitcoinData, globalData, marketsData] = await Promise.all([
-          fetchCoinData("bitcoin"),
-          fetchGlobalData(),
-          fetchCoinMarkets(),
-        ])
+        const [globalRes, coinRes] = await Promise.all([
+          fetch("/api/data?endpoint=global"),
+          fetch("/api/data?endpoint=coin"),
+        ]);
 
-        const btcMarketData = marketsData.find((coin) => coin.id === "bitcoin")
+        if (!globalRes.ok) {
+          console.log('globalRes', globalRes)
+          throw new Error(`Failed to fetch global data: ${globalRes.status}`);
+        }
+        if (!coinRes.ok) {
+          console.log('coinRes', coinRes)
+          throw new Error(`Failed to fetch coin data: ${coinRes.status}`);
+        }
 
-        setMetrics([
-          { label: "24H HIGH", value: `$${bitcoinData.market_data.high_24h.usd.toLocaleString()}` },
-          { label: "24H LOW", value: `$${bitcoinData.market_data.low_24h.usd.toLocaleString()}` },
-          { label: "24H VOL (BTC)", value: bitcoinData.market_data.total_volume.btc.toLocaleString() },
-          { label: "24H VOL (USD)", value: `$${bitcoinData.market_data.total_volume.usd.toLocaleString()}` },
-          { label: "ATH (USD)", value: `$${bitcoinData.market_data.ath.usd.toLocaleString()}` },
-          { label: "MARKET CAP", value: `$${bitcoinData.market_data.market_cap.usd.toLocaleString()}` },
-          { label: "CIRCULATING SUPPLY", value: bitcoinData.market_data.circulating_supply.toLocaleString() },
-          { label: "BTC DOMINANCE", value: `${globalData.data.market_cap_percentage.btc.toFixed(2)}%` },
-          { label: "TOTAL MARKET CAP", value: `$${globalData.data.total_market_cap.usd.toLocaleString()}` },
+        const globalData = await globalRes.json();
+        const coinData = await coinRes.json();
+        console.log('globalData', globalData)
+        console.log('coinData', coinData)
+        const newMetrics = [
+          { label: "COINS", value: globalData?.Coins || "N/A" },
+          { label: "EXCHANGES", value: globalData?.Exchanges || "N/A" },
           {
-            label: "24H CHANGE",
-            value: `${btcMarketData.price_change_percentage_24h.toFixed(2)}%`,
-            className: btcMarketData.price_change_percentage_24h > 0 ? "text-green-500" : "text-red-500",
+            label: "24H VOL (BTC)",
+            value: coinData?.market_data.total_volume.btc.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }) ?? "N/A",
           },
-        ])
+          {
+            label: "24H VOL (USD)",
+            value: coinData?.market_data.total_volume.usd
+              ? `$${coinData.market_data.total_volume.usd.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`
+              : "N/A",
+          },
+          { label: "ATH (USD)", value: `$0` }, // No ATH from Venym
+          {
+            label: "MARKET CAP",
+            value: coinData?.market_data.market_cap.usd
+              ? `$${coinData.market_data.market_cap.usd.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`
+              : "N/A",
+          },
+          {
+            label: "CIRCULATING SUPPLY",
+            value:
+              coinData?.market_data.circulating_supply.toLocaleString("en-US", {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              }) ?? "N/A",
+          },
+          {
+            label: "BTC DOMINANCE",
+            value: globalData?.["BTC Dominance"]
+              ? `${parseFloat(globalData["BTC Dominance"]?.replace(/[^0-9.-]+/g, "")).toFixed(2)}%`
+              : "N/A",
+          },
+          {
+            label: "TOTAL MARKET CAP",
+            value: globalData?.["Market Cap"]
+              ? `$${parseFloat(globalData["Market Cap"]?.replace(/[^0-9.-]+/g, "")).toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`
+              : "N/A",
+          },
+          {
+            label: "ETH DOMINANCE",
+            value: globalData?.["ETH Dominance"]
+              ? `${parseFloat(globalData["ETH Dominance"]?.replace(/[^0-9.-]+/g, "")).toFixed(2)}%`
+              : "N/A",
+          },
+        ];
+        setMetrics(newMetrics);
+        console.log("Metrics after update:", newMetrics);
       } catch (error) {
-        console.error("Error fetching metrics data:", error)
-        setError("Failed to load metrics. Please try again later.")
+        console.error("Error fetching metrics data:", error);
+        setError("Failed to load metrics. Please try again later.");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
-    fetchData()
-  }, [])
+    fetchData();
+  }, []);
 
   if (loading) {
-    return <div className="text-white">Loading metrics...</div>
+    return <div className="text-white">Loading metrics...</div>;
   }
 
   if (error) {
-    return <div className="text-red-500">{error}</div>
+    return <div className="text-red-500">{error}</div>;
   }
 
+  console.log("Metrics before render:", metrics);
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
       {metrics.map((metric) => (
@@ -64,6 +125,5 @@ export function DashboardMetrics() {
         </Card>
       ))}
     </div>
-  )
+  );
 }
-

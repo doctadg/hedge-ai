@@ -3,33 +3,36 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowUp, ArrowDown } from "lucide-react"
-import { fetchCoinData } from "@/utils/api"
 
 export function LivePrice() {
-  const [price, setPrice] = useState<number | null>(null)
-  const [priceChange, setPriceChange] = useState<number | null>(null)
-  const [priceChangePercentage, setPriceChangePercentage] = useState<number | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [price, setPrice] = useState<number | null>(null);
+  const [priceChange, setPriceChange] = useState<number | null>(null);
+  const [priceChangePercentage, setPriceChangePercentage] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchPrice = async () => {
-      try {
-        const data = await fetchCoinData("bitcoin")
-        setPrice(data.market_data.current_price.usd)
-        setPriceChange(data.market_data.price_change_24h)
-        setPriceChangePercentage(data.market_data.price_change_percentage_24h)
-        setLoading(false)
-      } catch (error) {
-        console.error("Error fetching Bitcoin price:", error)
-        setLoading(false)
-      }
-    }
+    useEffect(() => {
+        const fetchPrice = async () => {
+            try {
+                const res = await fetch("/api/livecoinwatch?symbol=BTC");
+                if (!res.ok) {
+                    throw new Error(`Failed to fetch Bitcoin price: ${res.status}`);
+                }
+                const data = await res.json();
+                setPrice(data.rate);
+                setPriceChange(data.rate * (data.delta.day - 1));
+                setPriceChangePercentage((data.delta.day - 1) * 100);
+                setLoading(false);
+            } catch (error) {
+                console.error("Error fetching Bitcoin price:", error);
+                setLoading(false);
+            }
+        };
 
-    fetchPrice()
-    const interval = setInterval(fetchPrice, 60000) // Update every minute
+        fetchPrice();
+        const interval = setInterval(fetchPrice, 60000); // Update every minute
 
-    return () => clearInterval(interval)
-  }, [])
+        return () => clearInterval(interval);
+    }, []);
 
   if (loading) {
     return <div className="text-white">Loading price data...</div>
@@ -66,4 +69,3 @@ export function LivePrice() {
     </Card>
   )
 }
-

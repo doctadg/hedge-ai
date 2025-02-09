@@ -1,6 +1,8 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useDashboardAccess } from "@/hooks/useDashboardAccess"
+import { PremiumModal } from "@/components/ui/PremiumModal"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 const data = [
@@ -13,8 +15,24 @@ const data = [
 ]
 
 export default function PerformancePage() {
+  const { isPremium } = useDashboardAccess()
+
   return (
     <div className="space-y-6">
+      {!isPremium ? (
+        <PremiumModal>
+          <Content />
+        </PremiumModal>
+      ) : (
+        <Content />
+      )}
+    </div>
+  )
+}
+
+function Content() {
+  return (
+    <>
       <h1 className="text-2xl font-bold text-white">Performance Analysis</h1>
 
       <div className="grid gap-6">
@@ -37,7 +55,12 @@ export default function PerformancePage() {
                       color: "#fff",
                     }}
                   />
-                  <Line type="monotone" dataKey="pnl" stroke="#22c55e" strokeWidth={2} />
+                  <Line
+                    type="monotone"
+                    dataKey="pnl"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -74,7 +97,6 @@ export default function PerformancePage() {
           </Card>
         </div>
       </div>
-    </div>
+    </>
   )
 }
-

@@ -1,11 +1,16 @@
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { useDashboardAccess } from "@/hooks/useDashboardAccess"
+import { PremiumModal } from "@/components/ui/PremiumModal"
 
 const strategies = [
   {
     name: "Delta Neutral",
-    description: "Maintain market neutrality through balanced long and short positions",
+    description:
+      "Maintain market neutrality through balanced long and short positions",
     status: "Active",
     performance: "+12.5%",
     isPositive: true,
@@ -27,8 +32,24 @@ const strategies = [
 ]
 
 export default function StrategiesPage() {
+  const { isPremium } = useDashboardAccess()
+
   return (
     <div className="space-y-6">
+      {!isPremium ? (
+        <PremiumModal>
+          <Content />
+        </PremiumModal>
+      ) : (
+        <Content />
+      )}
+    </div>
+  )
+}
+
+function Content() {
+  return (
+    <>
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-white">Hedging Strategies</h1>
         <Button className="bg-emerald-500 hover:bg-emerald-600 text-white">
@@ -44,11 +65,15 @@ export default function StrategiesPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <CardTitle className="text-white">{strategy.name}</CardTitle>
-                  <p className="text-sm text-gray-400 mt-1">{strategy.description}</p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    {strategy.description}
+                  </p>
                 </div>
                 <span
                   className={`px-2 py-1 rounded text-xs ${
-                    strategy.status === "Active" ? "bg-emerald-500/20 text-emerald-500" : "bg-gray-500/20 text-gray-400"
+                    strategy.status === "Active"
+                      ? "bg-emerald-500/20 text-emerald-500"
+                      : "bg-gray-500/20 text-gray-400"
                   }`}
                 >
                   {strategy.status}
@@ -59,7 +84,9 @@ export default function StrategiesPage() {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-400">Performance (30d)</span>
                 <span
-                  className={`flex items-center ${strategy.isPositive ? "text-emerald-500" : "text-red-500"} font-medium`}
+                  className={`flex items-center ${
+                    strategy.isPositive ? "text-emerald-500" : "text-red-500"
+                  } font-medium`}
                 >
                   {strategy.isPositive ? (
                     <ArrowUpRight className="mr-1 h-4 w-4" />
@@ -73,7 +100,6 @@ export default function StrategiesPage() {
           </Card>
         ))}
       </div>
-    </div>
+    </>
   )
 }
-

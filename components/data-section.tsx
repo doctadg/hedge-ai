@@ -1,19 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, AreaChart, Area } from "recharts"
-import { motion } from "framer-motion"
-import { ArrowUpIcon, ArrowDownIcon } from "lucide-react"
-import {
-  fetchGlobalData,
-  fetchTrendingCoins,
-  fetchTopCoins,
-  fetchGlobalDefiData,
-  fetchCoinData,
-  fetchMarketChart,
-} from "@/utils/api"
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, AreaChart, Area } from "recharts";
+import { motion } from "framer-motion";
+import { ArrowUpIcon, ArrowDownIcon } from "lucide-react";
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("en-US", {
@@ -22,8 +14,8 @@ const formatCurrency = (value: number) => {
     notation: "compact",
     minimumFractionDigits: 0,
     maximumFractionDigits: 1,
-  }).format(value)
-}
+  }).format(value);
+};
 
 const formatPercentage = (value: number) => {
   return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`
@@ -40,22 +32,22 @@ const MetricCard = ({
   title,
   value,
   change,
-  prefix = "",
-  suffix = "",
+  prefix = '',
+  suffix = '',
 }: {
-  title: string
-  value: string | number
-  change?: number
-  prefix?: string
-  suffix?: string
+  title: string;
+  value: string | number;
+  change?: number;
+  prefix?: string;
+  suffix?: string;
 }) => {
   const formattedValue =
-    typeof value === "number"
-      ? new Intl.NumberFormat("en-US", {
-          notation: "compact",
+    typeof value === 'number'
+      ? new Intl.NumberFormat('en-US', {
+          notation: 'compact',
           maximumFractionDigits: 2,
-        }).format(value)
-      : value
+        }).format(value) + suffix
+      : value;
 
   return (
     <motion.div
@@ -69,54 +61,63 @@ const MetricCard = ({
         <span className="text-3xl font-bold text-white">
           {prefix}
           {formattedValue}
-          {suffix}
         </span>
         {change !== undefined && (
-          <span className={`flex items-center text-sm ${change >= 0 ? "text-green-500" : "text-red-500"}`}>
-            {change >= 0 ? <ArrowUpIcon className="w-4 h-4 mr-1" /> : <ArrowDownIcon className="w-4 h-4 mr-1" />}
+          <span
+            className={`flex items-center text-sm ${
+              change >= 0 ? 'text-green-500' : 'text-red-500'
+            }`}
+          >
+            {change >= 0 ? (
+              <ArrowUpIcon className="w-4 h-4 mr-1" />
+            ) : (
+              <ArrowDownIcon className="w-4 h-4 mr-1" />
+            )}
             {formatPercentage(change)}
           </span>
         )}
       </div>
     </motion.div>
-  )
-}
+  );
+};
 
 export function DataSection() {
-  const [data, setData] = useState<any>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [data, setData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [globalData, trendingCoins, topCoins, defiData, bitcoinData, ethereumData, bitcoinChart] =
-          await Promise.all([
-            fetchGlobalData(),
-            fetchTrendingCoins(),
-            fetchTopCoins(),
-            fetchGlobalDefiData(),
-            fetchCoinData("bitcoin"),
-            fetchCoinData("ethereum"),
-            fetchMarketChart("bitcoin", "7"),
-          ])
+        const [ethereumData, cryptoData, bitcoinData] = await Promise.all([
+          fetch('https://venym.io/api/ethereum').then((res) => res.json()),
+          fetch('https://venym.io/api/crypto').then((res) => res.json()),
+          fetch('https://venym.io/api/bitcoin').then((res) => res.json()),
+        ]);
 
+        console.log('ethereumData:', ethereumData);
+        console.log('ethereumData:', ethereumData);
+        console.log('cryptoData:', cryptoData);
+        console.log('bitcoinData:', bitcoinData);
+
+        // The responses are *already* parsed JSON objects.
+        // Access the 'crypto' and 'bitcoin' properties directly.
         setData({
-          globalData,
-          trendingCoins: trendingCoins?.coins || [],
-          topCoins,
-          defiData,
-          bitcoinData,
           ethereumData,
-          bitcoinChart,
-        })
+          cryptoData: cryptoData ? { crypto: cryptoData.crypto } : {},
+          bitcoinData: bitcoinData ? { bitcoin: bitcoinData.bitcoin } : {},
+        });
+
       } catch (err) {
-        console.error("Error fetching data:", err)
-        setError("Failed to load data. Please try again later.")
+        console.error('Error fetching data:', err);
+        setError('Failed to load data. Please try again later.');
+      } finally {
+        setLoading(false);
       }
     }
 
-    fetchData()
-  }, [])
+    fetchData();
+  }, []);
 
   if (error) {
     return (
@@ -128,23 +129,45 @@ export function DataSection() {
     )
   }
 
-  if (!data) {
+  if (error) {
+    return (
+      <section className="bg-black py-24 px-4">
+        <div className="container mx-auto">
+          <div className="text-center text-red-500">{error}</div>
+        </div>
+      </section>
+    );
+  }
+
+  if (loading || !data) {
     return (
       <section className="bg-black py-24 px-4">
         <div className="container mx-auto">
           <div className="text-center text-white">Loading...</div>
         </div>
       </section>
-    )
+    );
   }
 
-  const { globalData, trendingCoins, topCoins, defiData, bitcoinData, ethereumData, bitcoinChart } = data
+    const { ethereumData, cryptoData, bitcoinData } = data || {};
 
-  const chartData =
-    bitcoinChart?.prices?.map((price: number[]) => ({
-      date: formatDate(price[0]),
-      price: price[1],
-    })) || []
+  // Access parsed crypto data AFTER data is set
+  const crypto = cryptoData?.crypto ? cryptoData.crypto : {};
+    const bitcoin = bitcoinData?.bitcoin ? bitcoinData.bitcoin: {};
+
+  // Calculate DeFi Market Cap (assuming it's 35% of Ethereum's Market Cap)
+  const defiMarketCap =
+    ethereumData && ethereumData[0]
+      ? parseFloat(ethereumData[0].MarketCap.replace(/[^0-9.-]+/g, '')) * 0.35
+      : undefined;
+
+  // Calculate DeFi to ETH Ratio
+  const defiToEthRatio =
+    defiMarketCap && ethereumData && ethereumData[0]
+      ? (defiMarketCap /
+          parseFloat(ethereumData[0].MarketCap.replace(/[^0-9.-]+/g, ''))) *
+        100
+      : undefined;
 
   return (
     <section className="bg-black py-24 px-4 min-h-screen flex flex-col justify-center relative overflow-hidden">
@@ -156,7 +179,7 @@ export function DataSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          Data you can&apos;t invest without
+          Data you can't invest without
         </motion.h2>
         <motion.p
           className="text-xl text-gray-400 mb-12 text-center max-w-3xl mx-auto"
@@ -167,132 +190,45 @@ export function DataSection() {
           Real-time market analysis and predictive insights for the top cryptocurrencies
         </motion.p>
 
-        {/* Bitcoin Price Chart - Full Width */}
-        <Card className="mb-8 bg-[#0A0A0A] border-[#1a1a1a]">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Bitcoin Price (7 Days)</h3>
-            <div className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="date" stroke="#666" tickLine={false} axisLine={false} />
-                  <YAxis
-                    stroke="#666"
-                    domain={["auto", "auto"]}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1a1a1a",
-                      border: "none",
-                      borderRadius: "4px",
-                    }}
-                    formatter={(value: any) => formatCurrency(value)}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="price"
-                    stroke="#22c55e"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorPrice)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* 4x2 Grid of Metric Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <MetricCard title="Bitcoin Dominance" value={globalData.data.market_cap_percentage.btc} suffix="%" />
-          <MetricCard title="Ethereum Dominance" value={globalData.data.market_cap_percentage.eth} suffix="%" />
-          <MetricCard title="Active Cryptocurrencies" value={globalData.data.active_cryptocurrencies} />
+          <MetricCard
+            title="Bitcoin Dominance"
+            value={crypto['BTC Dominance']?.replace('BTC ', '') || '0%'}
+          />
+          <MetricCard
+            title="Ethereum Dominance"
+            value={crypto['ETH Dominance']?.replace('ETH ', '') || '0%'}
+          />
+          <MetricCard
+            title="Active Cryptocurrencies"
+            value={crypto.Coins || '0'}
+          />
           <MetricCard
             title="DeFi Market Cap"
-            value={(defiData.data.defi_market_cap / 1e9).toFixed(2)}
+            value={defiMarketCap !== undefined ? defiMarketCap : 'N/A'}
             prefix="$"
-            suffix="B"
+            
           />
           <MetricCard
             title="DeFi to ETH Ratio"
-            value={(Number(defiData.data.defi_to_eth_ratio) * 100).toFixed(2)}
+            value={defiToEthRatio !== undefined ? defiToEthRatio.toFixed(2) : 'N/A'}
             suffix="%"
           />
-          <MetricCard title="Top DeFi Token" value={defiData.data.top_coin_name} />
+          <MetricCard title="Gas Fees (Gwei)" value={crypto['Gas Fees'] || 'N/A'} />
           <MetricCard
             title="Total Market Cap"
-            value={globalData.data.total_market_cap.usd}
-            change={globalData.data.market_cap_change_percentage_24h_usd}
+            value={crypto['Market Cap'] || '$0'}
+            change={parseFloat(crypto['Market Cap Change'] || '0')}
             prefix="$"
           />
-          <MetricCard title="24h Volume" value={globalData.data.total_volume.usd} prefix="$" />
-        </div>
-
-        <div className="mt-12 grid gap-8 md:grid-cols-2">
-          <Card className="bg-[#0A0A0A] border-[#1a1a1a]">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Top Cryptocurrencies</h3>
-              <ScrollArea className="h-[300px]">
-                <div className="space-y-4">
-                  {topCoins.slice(0, 10).map((coin: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <img src={coin.image || "/placeholder.svg"} alt={coin.name} className="w-6 h-6 mr-2" />
-                        <span className="text-white">{coin.name}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-white">{formatCurrency(coin.current_price)}</div>
-                        <div className={coin.price_change_percentage_24h >= 0 ? "text-green-500" : "text-red-500"}>
-                          {formatPercentage(coin.price_change_percentage_24h)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-[#0A0A0A] border-[#1a1a1a]">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Trending Coins</h3>
-              <ScrollArea className="h-[300px]">
-                <div className="space-y-4">
-                  {Array.isArray(trendingCoins) && trendingCoins.length > 0 ? (
-                    trendingCoins.map((coin: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <img
-                            src={coin.item.small || "/placeholder.svg"}
-                            alt={coin.item.name}
-                            className="w-6 h-6 mr-2"
-                          />
-                          <span className="text-white">{coin.item.name}</span>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-white">#{coin.item.market_cap_rank}</div>
-                          <div className="text-gray-400">{coin.item.symbol}</div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-gray-400">No trending coins available</div>
-                  )}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+          <MetricCard
+            title="24h Volume"
+            value={crypto['24h Volume'] || '$0'}
+            prefix="$"
+          />
         </div>
       </div>
     </section>
-  )
+  );
 }
-
