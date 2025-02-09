@@ -1,5 +1,5 @@
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export function HeroSection() {
   return (
@@ -48,10 +48,21 @@ export function HeroSection() {
                 </Link>
               </Button>
             </div>
+            {/* Image with dynamic border */}
+            <div className="relative mt-8 rounded-md">
+              {" "}
+              {/* Wrapper div with rounded corners */}
+              <img
+                src="/dashboardpreview.png"
+                alt="Dashboard Preview"
+                className="rounded-md block z-10 relative" // Slightly rounded image, block to remove extra bottom spacing, higher z-index
+              />
+              <span className="absolute inset-0 rounded-md bg-gradient-to-r from-green-500 to-emerald-600 animate-border -z-10" />{" "}
+              {/* Gradient border, lower z-index */}
+            </div>
           </div>
         </div>
       </div>
     </section>
-  )
+  );
 }
-

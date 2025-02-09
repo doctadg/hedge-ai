@@ -19,7 +19,6 @@ const categories = [
   {
     title: "HEDGING",
     items: [
-      { label: "Strategies", icon: "Shield", href: "/dashboard/strategies" },
       { label: "Generate Strategy", icon: "LineChart", href: "/dashboard/generate-strategy" },
     ],
   },
@@ -111,4 +110,3 @@ export function DashboardSidebar() {
     </>
   )
 }
-

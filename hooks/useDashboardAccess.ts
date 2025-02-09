@@ -3,7 +3,6 @@
 import { useWallet } from "@/contexts/WalletContext";
 import { isPremiumUser } from "@/utils/isPremiumUser";
 import { useRouter, usePathname } from "next/navigation";
-import { PremiumModal } from "@/components/ui/PremiumModal";
 import { useEffect, useState } from "react";
 
 export function useDashboardAccess() {
@@ -21,8 +20,11 @@ export function useDashboardAccess() {
 
     if (isConnected) {
       checkPremium();
+      if (restrictedRoutes.includes(pathname) && !premium) {
+        setIsOpen(true);
+      }
     }
-  }, [account, isConnected]);
+  }, [account, isConnected, pathname]);
 
   const restrictedRoutes = [
     "/dashboard/allocations",
@@ -36,34 +38,18 @@ export function useDashboardAccess() {
 
   const isRestricted = restrictedRoutes.includes(pathname);
 
-  useEffect(() => {
-    if (isRestricted && !premium && isConnected) {
-      setIsOpen(true);
-    } else {
-      setIsOpen(false);
+    const onOpenChange = (open: boolean) => {
+        if (isRestricted && !premium && isConnected) {
+            setIsOpen(true);
+        } else {
+            setIsOpen(open)
+        }
     }
-  }, [isRestricted, premium, isConnected, pathname]);
-
-  const renderContent = (children: React.ReactNode): React.ReactNode => {
-    if (isConnected && premium) {
-      return children;
-    }
-    if (!isConnected) {
-      return children;
-    }
-
-    return children;
-  };
-
-  const openModal = () => {
-    setIsOpen(true);
-  };
 
   return {
     isConnected,
     isPremium: premium,
-    renderContent,
     isOpen,
-    openModal,
+    onOpenChange
   };
 }
