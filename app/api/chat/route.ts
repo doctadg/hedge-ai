@@ -1,34 +1,41 @@
 import { NextResponse } from 'next/server';
 
+async function fetchLiveCoinWatchData(code: string, start: number, end: number) {
+  const response = await fetch('https://api.livecoinwatch.com/coins/single/history', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': process.env.LIVECOINWATCH_API_KEY!,
+    },
+    body: JSON.stringify({
+      currency: 'USD',
+      code,
+      start,
+      end,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`LiveCoinWatch API request failed: ${response.status} - ${errorText}`);
+  }
+
+  return await response.json();
+}
+
 export async function POST(request: Request) {
   const { messages, pairData } = await request.json();
 
   try {
-    // Fetch Venym API data
-    const [cryptoDataRes, ethereumDataRes, bitcoinDataRes] = await Promise.all([
-      fetch('https://venym.io/api/crypto'),
-      fetch('https://venym.io/api/ethereum'),
-      fetch('https://venym.io/api/bitcoin'),
-    ]);
+    const now = Date.now();
+    const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
+    const code = pairData?.baseToken?.symbol;
 
-    const [cryptoData, ethereumData, bitcoinData] = await Promise.all([
-      cryptoDataRes.json(),
-      ethereumDataRes.json(),
-      bitcoinDataRes.json(),
-    ]);
+    if (!code) {
+      throw new Error("Could not determine token symbol for LiveCoinWatch data.");
+    }
 
-    const parsedCryptoData = cryptoData
-      ? { crypto: JSON.parse(cryptoData.crypto) }
-      : {};
-    const parsedBitcoinData = bitcoinData
-      ? { bitcoin: JSON.parse(bitcoinData.bitcoin) }
-      : {};
-
-    const venymData = {
-      crypto: parsedCryptoData.crypto,
-      ethereum: ethereumData,
-      bitcoin: parsedBitcoinData.bitcoin,
-    };
+    const liveCoinWatchData = await fetchLiveCoinWatchData(code, twentyFourHoursAgo, now);
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -42,11 +49,11 @@ export async function POST(request: Request) {
         messages: [
           {
             role: 'system',
-            content: `You are a sophisticated crypto market analyst assistant named "Genius". Your task is to provide insightful, data-driven answers and analysis related to cryptocurrency tokens. You will be given data from multiple sources, including the Venym API (general crypto data, Ethereum data, and Bitcoin data) and Dexscreener (detailed token-specific data).
+            content: `You are a sophisticated crypto market analyst assistant named "Genius". Your task is to provide insightful, data-driven answers and analysis related to cryptocurrency tokens. You will be given data from Dexscreener (detailed token-specific data) and LiveCoinWatch (historical data).
 
-Your responses should be concise, informative, and professional. Avoid overly technical jargon unless necessary. Focus on providing actionable insights and clear explanations. **Do not include any disclaimers about not being able to provide financial advice.** Provide confident analysis and answer questions directly based on the available data. Assume the user understands the inherent risks of cryptocurrency investments.
+Your responses should be concise, informative, and professional. Avoid overly technical jargon unless necessary. Focus on providing actionable insights, analysis, and **direct recommendations** based on the available data. Assume the user understands the inherent risks of cryptocurrency investments and is seeking your expert opinion.
 
-When analyzing a token, consider the following factors (if data is available):
+When analyzing a token, consider the following factors (if data is available), and provide clear buy/sell/hold recommendations based on your analysis:
 
 *   **Price Trends:** Analyze short-term, medium-term, and long-term price trends.
 *   **Trading Volume:** Assess trading volume and its implications. High volume often indicates strong interest, while low volume may suggest low interest or consolidation.
@@ -55,15 +62,16 @@ When analyzing a token, consider the following factors (if data is available):
 *   **Volatility:** Discuss the volatility of the token and its potential risks and rewards.
 *   **Recent News:** If available, incorporate any relevant recent news or developments related to the token or the broader market.
 *   **Comparisons:** If appropriate, compare the token to other similar tokens or to Bitcoin/Ethereum.
+*   **Historical Data:** Use historical data from the LiveCoinWatch API to inform your analysis.
 * **Calculations:** Perform relevant calculations, such as percentage changes, moving averages, or other technical indicators if the data supports it.
 
-**Venym API Data:**
-${JSON.stringify(venymData)}
+**LiveCoinWatch Historical Data:**
+${JSON.stringify(liveCoinWatchData)}
 `,
           },
           {
             role: 'user',
-            content: `Analyze the following token using the provided Dexscreener data and the Venym API data in the system prompt. Address the factors listed in the system prompt as comprehensively as possible, given the available data:
+            content: `Analyze the following token using the provided Dexscreener data. Address the factors listed in the system prompt as comprehensively as possible, given the available data:
 
 ${JSON.stringify(pairData)}`,
           },
@@ -81,7 +89,7 @@ ${JSON.stringify(pairData)}`,
   } catch (error) {
     console.error('Error in chat API:', error);
     return NextResponse.json(
-      { error: 'Failed to process chat request' },
+      { error: 'Failed to process chat request', details: error instanceof Error ? error.message: "Unknown Error" },
       { status: 500 }
     );
   }
