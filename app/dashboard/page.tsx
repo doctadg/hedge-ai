@@ -8,11 +8,13 @@ import { LoginModal } from "@/components/ui/LoginModal"
 import { useEffect, useState } from "react"
 import Web3 from "web3"
 import { ConnectButton } from "@/components/ConnectButton"
+import { isPremiumUser } from "@/utils/isPremiumUser"
 
 export default function DashboardPage() {
   const [isConnected, setIsConnected] = useState(false)
   const [account, setAccount] = useState<string | null>(null)
   const [hasMounted, setHasMounted] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
 
   useEffect(() => {
     setHasMounted(true);
@@ -58,6 +60,17 @@ export default function DashboardPage() {
     setAccount(null)
   }
 
+    useEffect(() => {
+    const checkPremiumStatus = async () => {
+      if (account) {
+        const premium = await isPremiumUser(account);
+        setIsPremium(premium);
+      }
+    };
+
+    checkPremiumStatus();
+  }, [account]);
+
   if (!hasMounted) {
     return null;
   }
@@ -75,10 +88,16 @@ export default function DashboardPage() {
           </LoginModal>
         ) : (
           <>
-            <LivePrice />
-            <DashboardChart />
-            <DashboardMetrics />
+          {isPremium ? (
+            <>
+              <LivePrice />
+              <DashboardChart />
+              <DashboardMetrics />
+              <MarketOverview />
+            </>
+          ) : (
             <MarketOverview />
+          )}
           </>
         )}
       </div>
