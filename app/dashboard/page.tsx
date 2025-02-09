@@ -94,16 +94,10 @@ export default function DashboardPage() {
               <div>Loading...</div> // Show loading indicator
             ) : (
               <>
-                {isPremium ? (
-                  <>
-                    <LivePrice />
-                    <DashboardChart />
-                    <DashboardMetrics />
-                    <MarketOverview />
-                  </>
-                ) : (
-                  <MarketOverview />
-                )}
+                <LivePrice />
+                <DashboardChart />
+                <DashboardMetrics />
+                <MarketOverview />
               </>
             )}
           </>
