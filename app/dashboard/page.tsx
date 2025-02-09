@@ -15,6 +15,7 @@ export default function DashboardPage() {
   const [account, setAccount] = useState<string | null>(null)
   const [hasMounted, setHasMounted] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Add loading state
 
   useEffect(() => {
     setHasMounted(true);
@@ -64,6 +65,7 @@ export default function DashboardPage() {
     const checkPremiumStatus = async () => {
       if (account) {
         const premium = await isPremiumUser(account);
+        setIsLoading(false); // Set loading to false after fetching
         setIsPremium(premium);
       }
     };
@@ -88,16 +90,22 @@ export default function DashboardPage() {
           </LoginModal>
         ) : (
           <>
-          {isPremium ? (
-            <>
-              <LivePrice />
-              <DashboardChart />
-              <DashboardMetrics />
-              <MarketOverview />
-            </>
-          ) : (
-            <MarketOverview />
-          )}
+            {isLoading ? (
+              <div>Loading...</div> // Show loading indicator
+            ) : (
+              <>
+                {isPremium ? (
+                  <>
+                    <LivePrice />
+                    <DashboardChart />
+                    <DashboardMetrics />
+                    <MarketOverview />
+                  </>
+                ) : (
+                  <MarketOverview />
+                )}
+              </>
+            )}
           </>
         )}
       </div>
