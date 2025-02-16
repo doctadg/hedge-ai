@@ -58,9 +58,11 @@ function MetricSection({
         <Icon className="h-4 w-4 text-gray-400" />
         <h3 className="text-sm font-medium text-white">{title}</h3>
       </div>
-      <div className="grid gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         {metrics.map((metric, index) => (
-          <MetricCard key={index} {...metric} />
+          <div key={index}>
+            <MetricCard label={metric.label} value={metric.value} change={metric.change} prefix={metric.prefix} suffix={metric.suffix} />
+          </div>
         ))}
       </div>
     </div>
@@ -75,7 +77,7 @@ export function FeatureSection() {
     async function fetchData() {
       try {
         const [ethData, globalData, defiData] = await Promise.all([
-          fetchCoinData("ethereum"),
+          fetchCoinData(),
           fetchGlobalData(),
           fetchGlobalDefiData()
         ]);
@@ -126,6 +128,10 @@ export function FeatureSection() {
 
   const { ethData, globalData, defiData } = data;
 
+  const formattedDefiTvl = defiData?.data?.defi_market_cap ? new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(defiData?.data?.defi_market_cap) : "$0";
 
   const sections = {
     trending: {
@@ -215,7 +221,7 @@ export function FeatureSection() {
       metrics: [
         {
           label: "Total DeFi TVL",
-          value: defiData?.data?.defi_market_cap || 0,
+          value: formattedDefiTvl,
           prefix: "$",
           change: defiData?.data?.defi_24h_vol_change || 0,
         },
@@ -231,7 +237,7 @@ export function FeatureSection() {
         },
         {
           label: "Active dApps",
-          value: "3,945", // Not available in current API responses
+          value: "3945", // Not available in current API responses
         },
       ],
     },
@@ -282,7 +288,7 @@ export function FeatureSection() {
         </div>
 
         <Card className="border-0 bg-[#0A0A0A] shadow-2xl">
-          <CardContent className="grid gap-8 p-6 md:grid-cols-3 lg:grid-cols-5">
+          <CardContent className="grid gap-8 p-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             {Object.entries(sections).map(([key, section], index) => (
               <motion.div
                 key={key}

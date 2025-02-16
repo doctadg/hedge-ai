@@ -19,6 +19,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="icon" href="/hedgelogo.png" sizes="any" />
+      </head>
       <WalletProvider>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <body className={inter.className}>{children}</body>

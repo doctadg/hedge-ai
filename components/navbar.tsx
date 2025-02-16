@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 
 export function Navbar() {
@@ -25,7 +26,14 @@ export function Navbar() {
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="text-xl font-bold text-white">
+          <Link href="/" className="flex items-center gap-2 text-xl font-bold text-white">
+            <Image
+              src="/hedgelogo.png"
+              alt="Hedge AI Logo"
+              width={32}
+              height={32}
+              className="rounded-full"
+            />
             Hedge AI
           </Link>
           <Button asChild className="bg-green-500 text-white hover:bg-green-600 transition-colors">
@@ -36,4 +44,3 @@ export function Navbar() {
     </nav>
   )
 }
-

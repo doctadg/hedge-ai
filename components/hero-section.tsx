@@ -55,10 +55,9 @@ export function HeroSection() {
               <img
                 src="/dashboardpreview.png"
                 alt="Dashboard Preview"
-                className="rounded-md block z-10 relative" // Slightly rounded image, block to remove extra bottom spacing, higher z-index
+                className="rounded-md block z-10 relative hidden md:block" // Slightly rounded image, block to remove extra bottom spacing, higher z-index
               />
-              <span className="absolute inset-0 rounded-md bg-gradient-to-r from-green-500 to-emerald-600 animate-border -z-10" />{" "}
-              {/* Gradient border, lower z-index */}
+              <span className="absolute inset-0 rounded-md bg-gradient-to-r from-green-500 to-emerald-600 animate-border -z-10" />
             </div>
           </div>
         </div>
