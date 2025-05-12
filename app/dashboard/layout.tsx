@@ -3,6 +3,7 @@
 import { DashboardTopBar } from "@/components/dashboard/top-bar";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import type React from "react";
+import { useState, useEffect } from "react"; // Import useState and useEffect
 import { useDashboardAccess } from "@/hooks/useDashboardAccess";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ChatProvider } from "@/contexts/ChatContext"; // Import ChatProvider
@@ -13,6 +14,11 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { isOpenModal, onOpenModalChange } = useDashboardAccess();
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-black">
@@ -36,7 +42,7 @@ export default function DashboardLayout({
       {/* Wrap the sidebar and main content with ChatProvider */}
       <ChatProvider>
         <div className="flex flex-1 overflow-hidden"> {/* Added overflow-hidden here */}
-          <DashboardSidebar />
+          {hasMounted && <DashboardSidebar />} {/* Conditionally render Sidebar */}
           {/* Removed overflow-auto from main, let children handle scroll */}
           <main className="flex-1 p-6">{children}</main> 
         </div>
