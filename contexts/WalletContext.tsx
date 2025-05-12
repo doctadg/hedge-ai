@@ -20,7 +20,6 @@ interface WalletContextType {
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
-console.log("WalletContext:", WalletContext)
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [isConnected, setIsConnected] = useState(false)
@@ -86,8 +85,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (!response.ok) {
         console.error("Error registering wallet:", data.error || 'Unknown error');
       } else {
-        console.log("Wallet registered/verified:", data.message, data.user);
-        console.log("Wallet registered/verified:", data.message, data.user);
+        console.log("Wallet registered/verified:", data.message, data.user); // Keep one log
         if (data.user) {
           setCurrentUser({
             id: data.user.id,
@@ -119,6 +117,5 @@ export function useWallet() {
   if (context === undefined) {
     throw new Error("useWallet must be used within a WalletProvider")
   }
-  console.log("useWallet:", useWallet)
   return context
 }
