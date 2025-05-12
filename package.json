@@ -7,7 +7,7 @@
     "build": "npm run db:setup && next build",
     "start": "next start",
     "lint": "next lint",
-    "db:setup": "node -r dotenv/config db/setup.mjs"
+    "db:setup": "npx prisma db push"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
