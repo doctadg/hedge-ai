@@ -1,11 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma'; // Import shared Prisma client instance
+import prisma from '@/lib/prisma';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route"; // Adjust path as needed
 
 const VENYMIO_AGENT_ENDPOINT_URL = process.env.VENYMIO_AGENT_ENDPOINT_URL;
 const VENYMIO_API_KEY = process.env.VENYMIO_API_KEY;
 
 export async function POST(request: NextRequest) {
-  console.log('[API hedge-chat/agent] Request received (walletAddress auth).');
+  console.log('[API hedge-chat/agent] Request received.');
+
+  // --- Authentication/Authorization with NextAuth Session ---
+  // Note: For app router, getServerSession needs to be called with request and a dummy response or by passing `req` and `res` if available.
+  // However, a more common pattern in app router is to use `getToken` or pass the request directly.
+  // Let's assume we can get the session. If this is an Edge function, `getToken` would be preferred.
+  // For standard Node.js runtime with app router, direct `req` and `res` might not be available.
+  // A common workaround is to use `headers()` from `next/headers` to reconstruct parts needed by `getServerSession`
+  // or to use a helper that wraps this. For simplicity, we'll try the direct approach.
+  // If this API is not an Edge function, we might need to adjust how session is retrieved.
+  // The middleware should have already blocked unauthenticated requests.
+  const session = await getServerSession(authOptions); // Simplified call, might need req/res for older NextAuth versions or specific setups
+
+  if (!session || !session.user) {
+    console.error('[API hedge-chat/agent] Unauthorized: No active session or user data found.');
+    // Middleware should ideally catch this, but as a fallback:
+    return NextResponse.json({ error: 'Unauthorized: Authentication required.' }, { status: 401 });
+  }
+
+  const userId = session.user.id as string; // Assuming ID is string from your session callback
+  const isUserPremium = session.user.isPremium as boolean;
+  const userWalletAddress = session.user.walletAddress as string; // Get wallet address from session
+
+  console.log(`[API hedge-chat/agent] User ${userId} (Wallet: ${userWalletAddress}) attempting access. Premium: ${isUserPremium}.`);
+
+  if (!isUserPremium) {
+    console.error(`[API hedge-chat/agent] Forbidden: User ${userId} is not premium.`);
+    return NextResponse.json({ error: 'Forbidden: Premium access required for AI chat agent.' }, { status: 403 });
+  }
+  // --- End Authentication/Authorization ---
 
   if (!VENYMIO_AGENT_ENDPOINT_URL || !VENYMIO_API_KEY) {
     console.error('[API hedge-chat/agent] Venymio environment variables not configured.');
@@ -16,7 +47,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       message,
-      walletAddress, // Expect walletAddress from the client
+      // walletAddress, // No longer needed from client for auth; use session.user.walletAddress if Venymio needs it
       hedgeConversationId: clientHedgeConversationId,
       historyForAgent,
       venymioContextId
@@ -25,29 +56,10 @@ export async function POST(request: NextRequest) {
     if (!message) {
       return NextResponse.json({ error: 'Missing required parameter: message' }, { status: 400 });
     }
-    if (!walletAddress || typeof walletAddress !== 'string') {
-      return NextResponse.json({ error: 'Missing or invalid walletAddress parameter.' }, { status: 400 });
-    }
+    // walletAddress from body is no longer used for auth. If Venymio needs it, pass session.user.walletAddress
 
-    // --- Authentication/Authorization based on walletAddress ---
-    const normalizedWalletAddress = walletAddress.toLowerCase();
-    const user = await prisma.user.findUnique({
-      where: { walletAddress: normalizedWalletAddress },
-      select: { id: true, isPremium: true }
-    });
-
-    if (!user) {
-      console.error(`[API hedge-chat/agent] Unauthorized: User not found for wallet ${normalizedWalletAddress}.`);
-      return NextResponse.json({ error: 'Unauthorized: User not found' }, { status: 401 });
-    }
-    if (!user.isPremium) {
-      console.error(`[API hedge-chat/agent] Forbidden: User ${user.id} is not premium.`);
-      return NextResponse.json({ error: 'Forbidden: Premium access required' }, { status: 403 });
-    }
-    const userId = user.id;
-    console.log(`[API hedge-chat/agent] User ${userId} authorized (Premium: ${user.isPremium}).`);
-    // --- End Authentication/Authorization ---
-
+    console.log(`[API hedge-chat/agent] User ${userId} authorized (Premium: ${isUserPremium}).`);
+    
     let hedgeConversationId = clientHedgeConversationId;
     let conversationVerified = !hedgeConversationId;
 

@@ -72,6 +72,7 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: 'jwt', // Using JWT for sessions
+    maxAge: 7 * 24 * 60 * 60, // 1 week in seconds
   },
   callbacks: {
     async jwt({ token, user }) {
@@ -113,8 +114,7 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        // Set secure based on environment
-        secure: process.env.NODE_ENV === 'production', 
+        secure: true, // Explicitly set secure for HTTPS environments like Vercel
         // domain: // Optional: specify domain if needed, e.g., for subdomains
       },
     },

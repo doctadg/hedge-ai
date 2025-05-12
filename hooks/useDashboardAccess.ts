@@ -1,62 +1,75 @@
 "use client";
 
 import { useWallet } from "@/contexts/WalletContext";
-// import { isPremiumUser } from "@/utils/isPremiumUser"; // No longer needed
-import { usePathname } from "next/navigation"; // useRouter not used, removed
+import { useSession } from "next-auth/react"; // Import useSession
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export function useDashboardAccess() {
-  const { isConnected, account, currentUser } = useWallet(); // Get currentUser from context
-  // const [premium, setPremium] = useState(false); // premium status now comes from currentUser
-  const [isOpen, setIsOpen] = useState(false); // For controlling a modal, presumably
+  const { isConnected: isWalletPhysicallyConnected, account } = useWallet(); // Renamed for clarity
+  const { data: session, status: sessionStatus } = useSession(); // Get NextAuth session and status
+  const [isOpen, setIsOpen] = useState(false); // For premium modal
   const pathname = usePathname();
 
-  const isUserPremium = !!currentUser?.isPremium; // Get premium status from currentUser
+  // User is considered authenticated if NextAuth session is active
+  const isAuthenticated = sessionStatus === "authenticated";
+  // Premium status comes from the NextAuth session token
+  const isUserPremium = !!session?.user?.isPremium;
 
   useEffect(() => {
-    if (isConnected && account) {
-      // Directly use currentUser?.isPremium in the condition
-      if (restrictedRoutes.includes(pathname) && !currentUser?.isPremium) {
-        setIsOpen(true);
-      } else {
-        // If not on a restricted route, or if user is premium, ensure modal is closed.
-        // This logic might need refinement if the modal is used for other purposes.
-        // For now, this ensures it closes if the condition for opening it is not met.
-        setIsOpen(false); 
-      }
-    } else if (!isConnected) {
-      // If not connected, ensure modal is closed (or handle as per desired UX)
+    // If NextAuth session is loading, don't make decisions yet
+    if (sessionStatus === "loading") {
+      return;
+    }
+
+    // If authenticated and on a restricted route but not premium, show modal
+    if (isAuthenticated && restrictedRoutes.includes(pathname) && !isUserPremium) {
+      setIsOpen(true);
+    } else {
       setIsOpen(false);
     }
-  }, [isConnected, account, pathname, currentUser]); // Depend on currentUser directly
+
+    // If not authenticated (e.g. session ended, or never logged in via NextAuth)
+    // and trying to access dashboard, the middleware should ideally redirect.
+    // This hook primarily handles the premium modal logic for authenticated users.
+    // The "connect wallet" prompt should be handled by components checking `isAuthenticated`
+    // and `isWalletPhysicallyConnected` separately if needed.
+
+  }, [isAuthenticated, isUserPremium, pathname, sessionStatus]);
 
   const restrictedRoutes = [
     "/dashboard/allocations",
     "/dashboard/chat",
     "/dashboard/generate-strategy",
     "/dashboard/performance",
-    "/dashboard/portfolio-chat",
+    // "/dashboard/portfolio-chat", // Assuming this might be a new/future route
     "/dashboard/settings",
-    // "/dashboard/strategies", // Assuming this was a typo or old route, common pattern is plural
   ];
 
-  const isRestricted = restrictedRoutes.includes(pathname);
+  const isRestrictedPage = restrictedRoutes.includes(pathname);
 
   const onOpenChange = (open: boolean) => {
-    // If trying to close the modal on a restricted page without premium, keep it open.
-    if (isRestricted && !isUserPremium && isConnected && !open) {
-      setIsOpen(true); 
+    // Prevent closing the premium modal on a restricted page if user is not premium
+    if (isAuthenticated && isRestrictedPage && !isUserPremium && !open) {
+      setIsOpen(true);
     } else {
       setIsOpen(open);
     }
   };
 
   return {
-    isConnected,
-    isPremium: isUserPremium, // Use premium status from context
-    isOpen,
-    onOpenChange,
-    // Expose currentUser if other parts of the dashboard need more details
-    // currentUser 
+    // `isAuthenticated` is the primary status for "logged in"
+    isAuthenticated,
+    // `isWalletPhysicallyConnected` can be used for UI like "Connect Wallet" button state
+    isWalletPhysicallyConnected,
+    // `sessionStatus` can be used to show loading indicators
+    sessionStatus,
+    // `session` object contains user data like walletAddress, isAdmin, isPremium
+    session,
+    isPremium: isUserPremium,
+    isOpenModal: isOpen, // Renamed for clarity (premium modal)
+    onOpenModalChange: onOpenChange, // Renamed for clarity
+    // The account from useWallet can still be useful for display purposes or direct interactions
+    walletAccount: account 
   };
 }

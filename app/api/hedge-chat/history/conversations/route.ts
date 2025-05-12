@@ -1,38 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-// Removed getServerSession and authOptions imports
-import prisma from '@/lib/prisma'; // Import shared Prisma client instance
+import prisma from '@/lib/prisma';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const walletAddress = searchParams.get('walletAddress'); // Expect walletAddress as query param
+  // --- Authentication/Authorization with NextAuth Session ---
+  const session = await getServerSession(authOptions);
 
-  if (!walletAddress || typeof walletAddress !== 'string') {
-    return NextResponse.json({ error: 'Missing or invalid query parameter: walletAddress' }, { status: 400 });
+  if (!session || !session.user) {
+    console.error('[API history/conversations] Unauthorized: No active session or user data found.');
+    return NextResponse.json({ error: 'Unauthorized: Authentication required.' }, { status: 401 });
   }
 
-  try {
-    // --- Authentication/Authorization based on walletAddress ---
-    const normalizedWalletAddress = walletAddress.toLowerCase();
-    const user = await prisma.user.findUnique({
-      where: { walletAddress: normalizedWalletAddress },
-      select: { id: true, isPremium: true } // Check for premium as well, assuming only premium users can see history
-    });
+  const userId = session.user.id as string;
+  const isUserPremium = session.user.isPremium as boolean;
+  const userWalletAddress = session.user.walletAddress as string;
 
-    if (!user) {
-      console.error(`[API history/conversations] Unauthorized: User not found for wallet ${normalizedWalletAddress}.`);
-      return NextResponse.json({ error: 'Unauthorized: User not found' }, { status: 401 });
-    }
-    // Assuming premium is required to view conversation history
-    if (!user.isPremium) {
-        console.error(`[API history/conversations] Forbidden: User ${user.id} is not premium.`);
-        return NextResponse.json({ error: 'Forbidden: Premium access required' }, { status: 403 });
-    }
-    const userId = user.id;
-    console.log(`[API history/conversations] User ${userId} authorized (Premium: ${user.isPremium}).`);
-    // --- End Authentication/Authorization ---
+  console.log(`[API history/conversations] User ${userId} (Wallet: ${userWalletAddress}) attempting to fetch conversations. Premium: ${isUserPremium}.`);
+
+  // Assuming premium is required to view conversation history
+  if (!isUserPremium) {
+      console.error(`[API history/conversations] Forbidden: User ${userId} is not premium.`);
+      return NextResponse.json({ error: 'Forbidden: Premium access required to view chat history.' }, { status: 403 });
+  }
+  // --- End Authentication/Authorization ---
+  
+  // const { searchParams } = new URL(request.url); // Not needed if walletAddress is not a param
+  // const walletAddress = searchParams.get('walletAddress'); // No longer needed for auth
+
+  try {
+    console.log(`[API history/conversations] User ${userId} authorized (Premium: ${isUserPremium}).`);
 
     const conversations = await prisma.conversation.findMany({
-      where: { userId: userId }, // Filter by the user's ID obtained from walletAddress lookup
+      where: { userId: userId }, // Filter by the userId from the session
       orderBy: {
         updatedAt: 'desc',
       },

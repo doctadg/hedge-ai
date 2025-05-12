@@ -13,7 +13,7 @@ interface UserDetails {
 
 interface WalletContextType {
   isConnected: boolean
-  connect: () => Promise<void>
+  connect: () => Promise<string | null> // Modified to return account or null
   disconnect: () => void
   account: string | null
   currentUser: UserDetails | null; // Added currentUser
@@ -26,50 +26,63 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [account, setAccount] = useState<string | null>(null)
   const [currentUser, setCurrentUser] = useState<UserDetails | null>(null); // Added currentUser state
 
+  // Effect to check initial connection and potentially re-sync with NextAuth session
   useEffect(() => {
     const checkConnection = async () => {
       if (typeof window !== "undefined" && window.ethereum) {
-        const web3 = new Web3(window.ethereum)
+        const web3 = new Web3(window.ethereum);
         try {
-          const accounts = await web3.eth.getAccounts()
+          const accounts = await web3.eth.getAccounts();
           if (accounts.length > 0) {
-            setIsConnected(true)
-            setAccount(accounts[0])
-            await registerUserWallet(accounts[0]); // Register on initial check
+            const currentAccount = accounts[0];
+            setAccount(currentAccount);
+            setIsConnected(true);
+            // We still call registerUserWallet to ensure user is in DB,
+            // but primary auth state comes from NextAuth.
+            await registerUserWallet(currentAccount);
           } else {
-            // No accounts found, ensure local state is cleared
             setIsConnected(false);
             setAccount(null);
             setCurrentUser(null);
           }
         } catch (error) {
-          console.error("Error checking wallet connection:", error)
+          console.error("Error checking wallet connection:", error);
           setIsConnected(false);
           setAccount(null);
           setCurrentUser(null);
         }
       }
-    }
+    };
 
-    checkConnection()
-  }, [])
+    checkConnection();
+    // Consider adding event listener for account changes if not already handled by NextAuth session updates
+    // window.ethereum?.on('accountsChanged', handleAccountsChanged);
+    // return () => window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
+  }, []);
 
-  const connect = async () => {
+  const connect = async (): Promise<string | null> => { // Modified to return account or null
     if (typeof window !== "undefined" && window.ethereum) {
       try {
-        await window.ethereum.request({ method: "eth_requestAccounts" })
-        const web3 = new Web3(window.ethereum)
-        const accounts = await web3.eth.getAccounts()
-        setIsConnected(true)
-        setAccount(accounts[0])
-        await registerUserWallet(accounts[0]); // Register on connect
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        const web3 = new Web3(window.ethereum);
+        const accounts = await web3.eth.getAccounts();
+        if (accounts.length > 0) {
+          const currentAccount = accounts[0];
+          setAccount(currentAccount);
+          setIsConnected(true);
+          await registerUserWallet(currentAccount); // Ensure user is in DB
+          return currentAccount; // Return the account
+        }
+        return null; // No account found
       } catch (error) {
-        console.error("Error connecting to wallet:", error)
+        console.error("Error connecting to wallet:", error);
+        return null;
       }
     } else {
-      console.error("Ethereum object not found, do you have MetaMask installed?")
+      console.error("Ethereum object not found, do you have MetaMask installed?");
+      return null;
     }
-  }
+  };
 
   const registerUserWallet = async (walletAddress: string) => {
     if (!walletAddress) return;

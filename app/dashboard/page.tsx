@@ -6,103 +6,83 @@ import { MarketOverview } from "@/components/dashboard/market-overview"
 import { LivePrice } from "@/components/dashboard/live-price"
 import { LoginModal } from "@/components/ui/LoginModal"
 import { useEffect, useState } from "react"
-import Web3 from "web3"
+// Web3 and direct wallet interaction might not be needed here anymore if ConnectButton handles it
+// import Web3 from "web3" 
 import { ConnectButton } from "@/components/ConnectButton"
-import { isPremiumUser } from "@/utils/isPremiumUser"
+// isPremiumUser util might be replaced by session data
+// import { isPremiumUser } from "@/utils/isPremiumUser" 
+import { useSession } from "next-auth/react" // Import useSession
+import { useDashboardAccess } from "@/hooks/useDashboardAccess" // To get premium status and modal state
 
 export default function DashboardPage() {
-  const [isConnected, setIsConnected] = useState(false)
-  const [account, setAccount] = useState<string | null>(null)
+  const { data: session, status: sessionStatus } = useSession();
+  // useDashboardAccess hook provides isAuthenticated, isPremium, sessionStatus, etc.
+  // We can use this to simplify logic here.
+  const { 
+    isAuthenticated, 
+    isPremium, 
+    sessionStatus: accessSessionStatus, // Renaming to avoid conflict if needed, though same as useSession's
+    // isOpenModal, // This is for the premium modal in layout, not login modal
+    // onOpenModalChange 
+  } = useDashboardAccess();
+
   const [hasMounted, setHasMounted] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // Add loading state
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
-  useEffect(() => {
-    const checkConnection = async () => {
-      if (typeof window !== "undefined" && window.ethereum) {
-        const web3 = new Web3(window.ethereum)
-        try {
-          const accounts = await web3.eth.getAccounts()
-          if (accounts.length > 0) {
-            setIsConnected(true)
-            setAccount(accounts[0])
-          }
-        } catch (error) {
-          console.error("Error checking wallet connection:", error)
-        }
-      }
-    }
-
-    checkConnection()
-  }, [])
-
-  const connect = async () => {
-    if (typeof window !== "undefined" && window.ethereum) {
-      try {
-        await window.ethereum.request({ method: "eth_requestAccounts" })
-        const web3 = new Web3(window.ethereum)
-        const accounts = await web3.eth.getAccounts()
-        setIsConnected(true)
-        setAccount(accounts[0])
-      } catch (error) {
-        console.error("Error connecting to wallet:", error)
-      }
-    } else {
-      console.error("Ethereum object not found, do you have MetaMask installed?")
-    }
-  }
-
-  const disconnect = () => {
-    setIsConnected(false)
-    setAccount(null)
-  }
-
-    useEffect(() => {
-    const checkPremiumStatus = async () => {
-      if (account) {
-        const premium = await isPremiumUser(account);
-        setIsLoading(false); // Set loading to false after fetching
-        setIsPremium(premium);
-      }
-    };
-
-    checkPremiumStatus();
-  }, [account]);
+  // The middleware should handle redirecting if not authenticated.
+  // This page will only render if the user is authenticated or session is loading.
+  // The LoginModal here is a bit redundant if middleware redirects to a login page.
+  // However, if the intent is to show a modal *on this page* if somehow reached while unauthenticated,
+  // then `isAuthenticated` from `useDashboardAccess` (which uses `useSession`) is the correct check.
 
   if (!hasMounted) {
+    // Prevents hydration errors
     return null;
   }
+
+  // Show loading state while session is being determined
+  if (accessSessionStatus === "loading") {
+    return <div>Loading session...</div>;
+  }
+
+  // If user is not authenticated, middleware should have redirected.
+  // If for some reason it didn't, or if we want an explicit in-page prompt:
+  if (!isAuthenticated) {
+    // This LoginModal will contain the ConnectButton which now handles NextAuth sign-in
+    return (
+      <LoginModal isOpen={true}> {/* isOpen is always true if not authenticated */}
+        <ConnectButton /> {/* ConnectButton is now self-contained */}
+      </LoginModal>
+    );
+  }
+
+  // At this point, user is authenticated.
+  // The premium status is available via `isPremium` from `useDashboardAccess`.
+  // The premium modal for restricted features is handled by `DashboardLayout` using `useDashboardAccess`.
+  // This page can now just display its content.
+  // The old `isLoading` for premium check is no longer needed as `isPremium` comes from session.
 
   return (
     <div className="space-y-6">
       <div className="w-full">
-        {!isConnected ? (
-          <LoginModal isOpen={!isConnected}>
-            <ConnectButton
-              isConnected={isConnected}
-              connect={connect}
-              disconnect={disconnect}
-            />
-          </LoginModal>
+        {/* All content below assumes user is authenticated.
+            Premium-specific content *within* this page would check `isPremium`.
+            But general dashboard access is granted. */}
+        <LivePrice />
+        <DashboardChart />
+        <DashboardMetrics />
+        <MarketOverview />
+        {/* Example of premium content check within the page:
+        {isPremium ? (
+          <div>Premium Feature X</div>
         ) : (
-          <>
-            {isLoading ? (
-              <div>Loading...</div> // Show loading indicator
-            ) : (
-              <>
-                <LivePrice />
-                <DashboardChart />
-                <DashboardMetrics />
-                <MarketOverview />
-              </>
-            )}
-          </>
+          <div>Upgrade to see Premium Feature X</div>
         )}
+        */}
       </div>
     </div>
-  )
+  );
 }

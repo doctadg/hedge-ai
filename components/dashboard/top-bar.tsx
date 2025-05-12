@@ -10,7 +10,7 @@ import { useWallet } from "@/contexts/WalletContext";
 
 
 export function DashboardTopBar() {
-  const { isConnected, connect, disconnect } = useWallet();
+  // const { isConnected, connect, disconnect } = useWallet(); // No longer needed here
   return (
     <div className="static top-0 left-0 right-0 z-50 w-full border-b border-gray-800 bg-black">
       {/* Apply full width and 7% horizontal padding */}
@@ -29,7 +29,8 @@ export function DashboardTopBar() {
               <Settings className="h-5 w-5" />
             </Button>
           </Link>
-          <ConnectButton isConnected={isConnected} connect={connect} disconnect={disconnect} />
+          {/* ConnectButton is now self-contained and uses useSession and useWallet internally */}
+          <ConnectButton />
 
         </div>
       </div>

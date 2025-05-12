@@ -1,8 +1,8 @@
 'use client';
 
 import React, { createContext, useState, useContext, useCallback, useEffect, ReactNode } from 'react';
-// import { useSession } from 'next-auth/react'; // No longer using useSession here
-import { useWallet } from './WalletContext'; // Import useWallet
+import { useSession } from 'next-auth/react'; // Import useSession
+// import { useWallet } from './WalletContext'; // WalletContext might still be needed if direct wallet actions are performed here
 
 interface Conversation {
   id: string;
@@ -28,13 +28,13 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [errorConversations, setErrorConversations] = useState<string | null>(null);
-  // const { data: session, status } = useSession(); // No longer using useSession here
-  const { account, currentUser } = useWallet(); // Get account and currentUser from WalletContext
+  const { data: session, status: sessionStatus } = useSession(); // Use NextAuth session
+  // const { account, currentUser } = useWallet(); // account and currentUser.isPremium will come from session
 
   const fetchConversations = useCallback(async () => {
-    // Only fetch if account is available and user is premium
-    if (!account || !currentUser?.isPremium) {
-      console.log('[ChatContext] Wallet not connected or user not premium, skipping conversation fetch.');
+    // Only fetch if authenticated and user is premium (from NextAuth session)
+    if (sessionStatus !== 'authenticated' || !session?.user?.isPremium) {
+      console.log('[ChatContext] User not authenticated or not premium, skipping conversation fetch.');
       setConversations([]);
       setIsLoadingConversations(false);
       return;
@@ -42,9 +42,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     setIsLoadingConversations(true);
     setErrorConversations(null);
-    console.log(`[ChatContext] Fetching conversations for wallet: ${account}`);
+    // Wallet address is not needed in the query param as backend uses session
+    console.log(`[ChatContext] Fetching conversations for user: ${session.user.id}`);
     try {
-      const response = await fetch(`/api/hedge-chat/history/conversations?walletAddress=${account}`);
+      // API call no longer needs walletAddress query parameter
+      const response = await fetch(`/api/hedge-chat/history/conversations`);
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.error || 'Failed to fetch conversations');
@@ -62,19 +64,19 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setIsLoadingConversations(false);
     }
-  }, [account, currentUser?.isPremium]); // Add account and currentUser.isPremium to dependencies
+  }, [sessionStatus, session]); // Depend on session status and session object
 
-  // Fetch conversations when account or premium status changes
+  // Fetch conversations when session status or user's premium status changes
   useEffect(() => {
-    if (account && currentUser?.isPremium) {
-      console.log('[ChatContext] Account connected and user is premium, triggering conversation fetch.');
+    if (sessionStatus === 'authenticated' && session?.user?.isPremium) {
+      console.log('[ChatContext] User authenticated and premium, triggering conversation fetch.');
       fetchConversations();
     } else {
-      console.log('[ChatContext] Account not connected or user not premium - clearing conversations.');
+      console.log('[ChatContext] User not authenticated or not premium - clearing conversations.');
       setConversations([]);
       setCurrentConversationId(null);
     }
-  }, [account, currentUser?.isPremium, fetchConversations]);
+  }, [sessionStatus, session, fetchConversations]); // session.user.isPremium is covered by `session` dependency
 
   const selectConversation = (conversationId: string) => {
     console.log('[ChatContext] Selecting conversation:', conversationId);

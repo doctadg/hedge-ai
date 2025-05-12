@@ -6,7 +6,8 @@ import { UserIcon, SparklesIcon, PaperclipIcon } from 'lucide-react';
 import { PaperAirplaneIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import AIChatResponseRenderer from './AIChatResponseRenderer';
 import { useChat } from '@/contexts/ChatContext';
-import { useWallet } from '@/contexts/WalletContext'; // Import useWallet
+// import { useWallet } from '@/contexts/WalletContext'; // Wallet address will come from session
+import { useSession } from 'next-auth/react'; // Import useSession
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Message {
@@ -45,7 +46,8 @@ export default function AIChatInterface() {
     fetchConversations,
     setCurrentConversationIdDirectly
   } = useChat();
-  const { account } = useWallet(); // Get wallet address from context
+  const { data: session, status: sessionStatus } = useSession(); // Use NextAuth session
+  // const { account } = useWallet(); // account will be derived from session if needed
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -65,15 +67,21 @@ export default function AIChatInterface() {
       return;
     }
     console.log('[AIChatInterface] Fetching messages for conversation:', conversationId);
-    setIsLoadingMessages(true);
-    setError(null);
-    if (!account) {
-      setError("Wallet not connected. Cannot fetch messages.");
-      setIsLoadingMessages(false);
+    // Only proceed if authenticated and premium.
+    if (sessionStatus !== 'authenticated' || !session?.user?.isPremium) {
+      console.log('[AIChatInterface] fetchMessages skipped: User not authenticated or not premium.');
+      if (!conversationId) setMessages([]);
       return;
     }
+    
+    // Wallet address is not needed in query param
+    console.log('[AIChatInterface] Fetching messages for conversation:', conversationId, 'for user:', session.user.id);
+    setIsLoadingMessages(true);
+    setError(null);
+
     try {
-      const response = await fetch(`/api/hedge-chat/history/messages?hedgeConversationId=${conversationId}&walletAddress=${account}`);
+      // API call no longer needs walletAddress query parameter
+      const response = await fetch(`/api/hedge-chat/history/messages?hedgeConversationId=${conversationId}`);
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.error || 'Failed to fetch messages');
@@ -96,12 +104,53 @@ export default function AIChatInterface() {
     } finally {
       setIsLoadingMessages(false);
     }
-  }, []); // Removed dependency array, will be called by useEffect
+  }, [sessionStatus, session]); // Depend on session status and session object
 
-  // Effect to fetch messages when conversation ID changes
+  const prevConversationIdRef = useRef<string | null | undefined>();
+
+  // Effect to fetch messages when conversation ID, session status, or premium status changes
   useEffect(() => {
-    fetchMessages(currentConversationId);
-  }, [currentConversationId, fetchMessages]);
+    const prevId = prevConversationIdRef.current;
+
+    if (activeBotMessageId) {
+      console.log('[AIChatInterface] useEffect skipped fetch: Active bot message streaming.');
+      prevConversationIdRef.current = currentConversationId;
+      return;
+    }
+
+    if (currentConversationId === null) {
+      console.log('[AIChatInterface] Switched to new chat, clearing messages.');
+      setMessages([]);
+      setError(null);
+      setIsLoadingMessages(false);
+      prevConversationIdRef.current = currentConversationId;
+      return;
+    }
+
+    // Wait for session to be authenticated and user to be premium
+    if (sessionStatus !== 'authenticated' || !session?.user?.isPremium || currentConversationId === undefined) {
+      console.log('[AIChatInterface] useEffect skipped fetch: Waiting for auth/premium or defined conversationId.');
+      prevConversationIdRef.current = currentConversationId;
+      return;
+    }
+    // Removed Condition 3 that was likely preventing fetches for existing conversations when prevId was null/undefined.
+    // The activeBotMessageId check should prevent fetching during new message streams.
+    
+    // Fetch if the conversation ID is set and has changed, or if it's an initial load with a conversation ID.
+    if (currentConversationId && currentConversationId !== prevId) {
+       console.log(`[AIChatInterface] Switched to existing conversation ${currentConversationId} from ${prevId}. Fetching messages.`);
+      fetchMessages(currentConversationId);
+    } else if (currentConversationId && prevId === undefined && sessionStatus === 'authenticated' && session?.user?.isPremium) {
+      // Handles initial load with a pre-selected conversation ID after session is ready
+      console.log(`[AIChatInterface] Initial load with conversation ${currentConversationId}. Fetching messages.`);
+      fetchMessages(currentConversationId);
+    }
+    else {
+      console.log(`[AIChatInterface] useEffect: No fetch needed. currentId: ${currentConversationId}, prevId: ${prevId}, sessionStatus: ${sessionStatus}`);
+    }
+    
+    prevConversationIdRef.current = currentConversationId; // Update ref for the next run
+  }, [currentConversationId, sessionStatus, session, fetchMessages, activeBotMessageId]); // Added session dependencies
 
   // handleSelectConversation and handleNewChat are removed (handled by sidebar/context)
 
@@ -132,15 +181,16 @@ export default function AIChatInterface() {
     console.log('[AIChatInterface] finalConversationId for saving:', finalConversationId);
     console.log('[AIChatInterface] completionData:', completionData);
 
-    if (finalConversationId && completionData.finalContent && account) {
-      console.log('[AIChatInterface] Proceeding to save agent message. Conversation ID:', finalConversationId);
+    // Ensure user is authenticated and premium before saving
+    if (finalConversationId && completionData.finalContent && sessionStatus === 'authenticated' && session?.user?.isPremium) {
+      console.log('[AIChatInterface] Proceeding to save agent message. Conversation ID:', finalConversationId, 'User ID:', session.user.id);
       try {
         const payload = {
           hedgeConversationId: finalConversationId, // Use captured ID
           agentContent: completionData.finalContent,
           thoughts: completionData.thoughts?.join('\n\n'), // Pass as single string
           toolStatus: completionData.toolStatus ? JSON.stringify(completionData.toolStatus) : undefined,
-          walletAddress: account, // Add wallet address
+          // walletAddress: account, // No longer send walletAddress, backend uses session
         };
         console.log('[AIChatInterface] Payload for save-agent-message:', payload);
 
@@ -184,19 +234,22 @@ export default function AIChatInterface() {
         setError(`Network error or issue calling save API: ${err.message}`);
       }
     } else {
-      console.warn('[AIChatInterface] Skipping save agent message. finalConversationId:', finalConversationId, 'finalContent exists:', !!completionData.finalContent);
+      console.warn('[AIChatInterface] Skipping save agent message. Conditions not met. finalConversationId:', finalConversationId, 
+                   'finalContent exists:', !!completionData.finalContent, 
+                   'sessionStatus:', sessionStatus, 
+                   'isPremium:', session?.user?.isPremium);
     }
-  // Added setCurrentConversationIdDirectly to dependencies if needed, fetchConversations from context
-  }, [activeBotMessageId, currentConversationId, fetchConversations, setCurrentConversationIdDirectly]); 
+  }, [sessionStatus, session, activeBotMessageId, currentConversationId, fetchConversations, setCurrentConversationIdDirectly]); 
 
 
   const handleSendMessage = async () => {
-    // Add check for account availability
-    if (!userInput.trim() || isSending || !account) {
-      if (!account) {
-        setError("Wallet not connected or address unavailable.");
-        console.error("[AIChatInterface] Cannot send message: Wallet account is null.");
-      }
+    // Check if authenticated and premium before sending
+    if (sessionStatus !== 'authenticated' || !session?.user?.isPremium) {
+      setError("Authentication or premium access required to send messages.");
+      console.error("[AIChatInterface] Cannot send message: User not authenticated or not premium.");
+      return;
+    }
+    if (!userInput.trim() || isSending) {
       return;
     }
 
@@ -239,20 +292,19 @@ export default function AIChatInterface() {
       const payload: any = {
         message: messageToSend,
         historyForAgent: historyForAgent,
-        walletAddress: account, // Add wallet address to payload
+        // walletAddress: account, // No longer send walletAddress, backend uses session
       };
       // Use conversation ID from context
       if (currentConversationId) {
         payload.hedgeConversationId = currentConversationId;
       }
 
-      console.log('[AIChatInterface] Sending payload to /api/hedge-chat/agent:', payload); // Log payload
+      console.log('[AIChatInterface] Sending payload to /api/hedge-chat/agent:', payload, 'User ID:', session.user.id);
 
       const response = await fetch('/api/hedge-chat/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        // credentials: 'include', // No longer needed if using walletAddress in body
       });
 
       if (!response.ok || !response.body) {

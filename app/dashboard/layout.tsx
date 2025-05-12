@@ -12,13 +12,13 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isOpen, onOpenChange } = useDashboardAccess();
+  const { isOpenModal, onOpenModalChange } = useDashboardAccess();
 
   return (
     <div className="flex flex-col min-h-screen bg-black">
       <DashboardTopBar />
       {/* Removed className from Dialog */}
-      <Dialog open={isOpen} onOpenChange={onOpenChange}> 
+      <Dialog open={isOpenModal} onOpenChange={onOpenModalChange}> 
         {/* Added className to DialogContent */}
         <DialogContent className="sm:max-w-[425px] data-[state=open]:bg-black/95"> 
           <DialogHeader>
