@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 // Icons for styling
-import { UserIcon, SparklesIcon, PaperclipIcon } from 'lucide-react'; // Removed PaperAirplaneIcon, ArrowPathIcon
-import { PaperAirplaneIcon, ArrowPathIcon } from '@heroicons/react/24/outline'; // Added imports from heroicons
+import { UserIcon, SparklesIcon, PaperclipIcon } from 'lucide-react';
+import { PaperAirplaneIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import AIChatResponseRenderer from './AIChatResponseRenderer';
-import { useChat } from '@/contexts/ChatContext'; // Import useChat
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // Import Avatar
+import { useChat } from '@/contexts/ChatContext';
+import { useWallet } from '@/contexts/WalletContext'; // Import useWallet
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Message {
   id: string;
@@ -41,9 +42,10 @@ export default function AIChatInterface() {
   // Get state and functions from context
   const { 
     currentConversationId, 
-    fetchConversations, 
-    setCurrentConversationIdDirectly 
+    fetchConversations,
+    setCurrentConversationIdDirectly
   } = useChat();
+  const { account } = useWallet(); // Get wallet address from context
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -65,9 +67,13 @@ export default function AIChatInterface() {
     console.log('[AIChatInterface] Fetching messages for conversation:', conversationId);
     setIsLoadingMessages(true);
     setError(null);
-    // Don't clear messages here, let the UI update naturally if needed
+    if (!account) {
+      setError("Wallet not connected. Cannot fetch messages.");
+      setIsLoadingMessages(false);
+      return;
+    }
     try {
-      const response = await fetch(`/api/hedge-chat/history/messages?hedgeConversationId=${conversationId}`);
+      const response = await fetch(`/api/hedge-chat/history/messages?hedgeConversationId=${conversationId}&walletAddress=${account}`);
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.error || 'Failed to fetch messages');
@@ -126,14 +132,15 @@ export default function AIChatInterface() {
     console.log('[AIChatInterface] finalConversationId for saving:', finalConversationId);
     console.log('[AIChatInterface] completionData:', completionData);
 
-    if (finalConversationId && completionData.finalContent) {
+    if (finalConversationId && completionData.finalContent && account) {
       console.log('[AIChatInterface] Proceeding to save agent message. Conversation ID:', finalConversationId);
       try {
         const payload = {
           hedgeConversationId: finalConversationId, // Use captured ID
           agentContent: completionData.finalContent,
-          thoughts: completionData.thoughts?.join('\n\n'), // Pass as single string 
+          thoughts: completionData.thoughts?.join('\n\n'), // Pass as single string
           toolStatus: completionData.toolStatus ? JSON.stringify(completionData.toolStatus) : undefined,
+          walletAddress: account, // Add wallet address
         };
         console.log('[AIChatInterface] Payload for save-agent-message:', payload);
 
@@ -141,6 +148,7 @@ export default function AIChatInterface() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
+          // credentials: 'include', // No longer needed
         });
 
         const responseText = await saveResponse.text(); // Get raw response text for debugging
@@ -183,10 +191,18 @@ export default function AIChatInterface() {
 
 
   const handleSendMessage = async () => {
-    if (!userInput.trim() || isSending) return;
+    // Add check for account availability
+    if (!userInput.trim() || isSending || !account) {
+      if (!account) {
+        setError("Wallet not connected or address unavailable.");
+        console.error("[AIChatInterface] Cannot send message: Wallet account is null.");
+      }
+      return;
+    }
+
 
     const optimisticUserMessage: Message = {
-      id: `user-${Date.now()}`, 
+      id: `user-${Date.now()}`,
       content: userInput, 
       isUserMessage: true, 
       createdAt: Date.now(), 
@@ -223,16 +239,20 @@ export default function AIChatInterface() {
       const payload: any = {
         message: messageToSend,
         historyForAgent: historyForAgent,
+        walletAddress: account, // Add wallet address to payload
       };
       // Use conversation ID from context
-      if (currentConversationId) { 
+      if (currentConversationId) {
         payload.hedgeConversationId = currentConversationId;
       }
 
-      const response = await fetch('/api/hedge-chat/agent', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(payload), 
+      console.log('[AIChatInterface] Sending payload to /api/hedge-chat/agent:', payload); // Log payload
+
+      const response = await fetch('/api/hedge-chat/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        // credentials: 'include', // No longer needed if using walletAddress in body
       });
 
       if (!response.ok || !response.body) {

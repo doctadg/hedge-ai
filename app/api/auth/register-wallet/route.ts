@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma'; // Import shared Prisma client instance
 
-const prisma = new PrismaClient();
+// Remove local Prisma client instantiation: const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,19 +14,38 @@ export async function POST(request: NextRequest) {
 
     const normalizedWalletAddress = walletAddress.toLowerCase();
 
-    // Upsert the user: find by walletAddress, or create if not exists.
-    // New users will default to isPremium: false, isAdmin: false as per schema.
-    const user = await prisma.user.upsert({
+    // Find user first, selecting only necessary fields
+    let user = await prisma.user.findUnique({
       where: { walletAddress: normalizedWalletAddress },
-      update: { 
-        // Optionally, update a lastLoginAt field here if you add one to the schema
-        updatedAt: new Date(), // Touch updatedAt to signify activity
-      }, 
-      create: {
-        walletAddress: normalizedWalletAddress,
-        // isPremium and isAdmin will default to false based on schema defaults
-      },
+      select: {
+        id: true,
+        walletAddress: true,
+        isPremium: true,
+        isAdmin: true,
+      }
     });
+
+    // If user doesn't exist, create them, selecting only necessary fields
+    if (!user) {
+      console.log(`User with wallet ${normalizedWalletAddress} not found, creating...`);
+      user = await prisma.user.create({
+        data: {
+          walletAddress: normalizedWalletAddress,
+          // isPremium and isAdmin will default to false based on schema defaults
+        },
+        select: { // Select the same fields after creation
+          id: true,
+          walletAddress: true,
+          isPremium: true,
+          isAdmin: true,
+        }
+      });
+      console.log(`User created:`, user);
+    } else {
+      console.log(`User with wallet ${normalizedWalletAddress} found.`);
+      // Optionally update something on existing user login if needed
+      // e.g., await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
+    }
 
     // For a real auth system, you'd generate and return a session token (e.g., JWT) here.
     // For now, we're just ensuring the user record exists.

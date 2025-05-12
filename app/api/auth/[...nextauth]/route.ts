@@ -1,12 +1,12 @@
 import NextAuth, { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma'; // Import shared Prisma client instance
 
-const prisma = new PrismaClient();
+// Remove local Prisma client instantiation: const prisma = new PrismaClient();
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter: PrismaAdapter(prisma), // Use shared instance
   providers: [
     CredentialsProvider({
       name: 'Admin Wallet Login',
@@ -57,11 +57,10 @@ export const authOptions: NextAuthOptions = {
 
         // Standard check for other users or if hardcoded admin was fetched/updated
         if (user && user.isAdmin) {
-          return { 
-            id: user.id, 
+          // Return only fields present in the User model
+          return {
+            id: user.id.toString(), // Adapter expects string ID
             walletAddress: user.walletAddress,
-            email: user.email, 
-            name: user.name,   
             isAdmin: true, // Ensure this is true for the hardcoded admin
             isPremium: user.isPremium,
           };
@@ -76,22 +75,26 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
-      // Persist isAdmin and isPremium to the JWT token
+      // Persist available user data to the JWT token
       if (user) {
-        token.id = user.id;
-        token.isAdmin = (user as any).isAdmin; // Cast if TS complains user type from provider doesn't have isAdmin
+        token.id = user.id; // Keep ID from authorize return
+        token.isAdmin = (user as any).isAdmin;
         token.isPremium = (user as any).isPremium;
         token.walletAddress = (user as any).walletAddress;
       }
       return token;
     },
     async session({ session, token }) {
-      // Persist isAdmin and isPremium to the session object
+      // Persist available user data to the session object
       if (session.user) {
         (session.user as any).id = token.id;
         (session.user as any).isAdmin = token.isAdmin;
         (session.user as any).isPremium = token.isPremium;
         (session.user as any).walletAddress = token.walletAddress;
+        // Remove fields not in the model
+        delete (session.user as any).email;
+        delete (session.user as any).name;
+        delete (session.user as any).image;
       }
       return session;
     },
@@ -102,6 +105,21 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET, // IMPORTANT: Set this in .env.local
   debug: process.env.NODE_ENV === 'development', // Enable debug logs in development
+  // Explicitly configure cookies for development compatibility
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`, // Default name, can be customized
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        // Set secure based on environment
+        secure: process.env.NODE_ENV === 'production', 
+        // domain: // Optional: specify domain if needed, e.g., for subdomains
+      },
+    },
+    // Add configurations for other cookies (callbackUrl, csrfToken) if needed
+  },
 };
 
 const handler = NextAuth(authOptions);

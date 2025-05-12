@@ -14,19 +14,21 @@ export function useDashboardAccess() {
   const isUserPremium = !!currentUser?.isPremium; // Get premium status from currentUser
 
   useEffect(() => {
-    // No need to fetch premium status separately, it's in currentUser
-    if (isConnected && account) { // Ensure account is also present, though currentUser implies it
-      if (restrictedRoutes.includes(pathname) && !isUserPremium) {
-        setIsOpen(true); // Open modal if on restricted route and not premium
-      } else if (!restrictedRoutes.includes(pathname) || isUserPremium) {
-        // If on non-restricted route, or if user is premium, ensure modal is closed
-        // This might be too aggressive if modal is used for other things.
-        // Consider if modal should only be set to true here and closed by its own logic.
-        // For now, let's assume it's only for premium restriction.
-        // setIsOpen(false); // Let's comment this out to prevent unintended closing. Modal should manage its own close.
+    if (isConnected && account) {
+      // Directly use currentUser?.isPremium in the condition
+      if (restrictedRoutes.includes(pathname) && !currentUser?.isPremium) {
+        setIsOpen(true);
+      } else {
+        // If not on a restricted route, or if user is premium, ensure modal is closed.
+        // This logic might need refinement if the modal is used for other purposes.
+        // For now, this ensures it closes if the condition for opening it is not met.
+        setIsOpen(false); 
       }
+    } else if (!isConnected) {
+      // If not connected, ensure modal is closed (or handle as per desired UX)
+      setIsOpen(false);
     }
-  }, [isConnected, account, pathname, isUserPremium]); // Add isUserPremium to dependencies
+  }, [isConnected, account, pathname, currentUser]); // Depend on currentUser directly
 
   const restrictedRoutes = [
     "/dashboard/allocations",

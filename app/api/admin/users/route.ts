@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma'; // Import shared Prisma client instance
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'; // Adjust path if necessary
 
-const prisma = new PrismaClient();
+// Remove local Prisma client instantiation: const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest) {
   // The middleware should have already performed the basic auth check.
@@ -20,15 +20,15 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         walletAddress: true,
-        email: true,
-        name: true,
+        // email: true, // Not in current schema
+        // name: true, // Not in current schema
         isPremium: true,
         isAdmin: true,
-        createdAt: true,
+        // createdAt: true, // Not in current schema
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      // orderBy: { // Cannot order by createdAt as it's not selected/available
+      //   createdAt: 'desc',
+      // },
     });
     return NextResponse.json(users);
   } catch (error: any) {

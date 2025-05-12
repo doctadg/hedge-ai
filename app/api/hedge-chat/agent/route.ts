@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client'; // Prisma client for hedge-ai DB
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma'; // Import shared Prisma client instance
 
 const VENYMIO_AGENT_ENDPOINT_URL = process.env.VENYMIO_AGENT_ENDPOINT_URL;
 const VENYMIO_API_KEY = process.env.VENYMIO_API_KEY;
 
 export async function POST(request: NextRequest) {
+  console.log('[API hedge-chat/agent] Request received (walletAddress auth).');
+
   if (!VENYMIO_AGENT_ENDPOINT_URL || !VENYMIO_API_KEY) {
     console.error('[API hedge-chat/agent] Venymio environment variables not configured.');
     return NextResponse.json({ error: 'Server configuration error for AI chat agent.' }, { status: 500 });
@@ -14,30 +14,73 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { 
-      message, 
-      hedgeConversationId: clientHedgeConversationId, // ID from hedge-ai's database
-      historyForAgent, // Pre-formatted history to send to Venymio
-      venymioContextId // Optional: if hedge-ai wants to maintain a specific Venymio context ID
+    const {
+      message,
+      walletAddress, // Expect walletAddress from the client
+      hedgeConversationId: clientHedgeConversationId,
+      historyForAgent,
+      venymioContextId
     } = body;
 
     if (!message) {
       return NextResponse.json({ error: 'Missing required parameter: message' }, { status: 400 });
     }
+    if (!walletAddress || typeof walletAddress !== 'string') {
+      return NextResponse.json({ error: 'Missing or invalid walletAddress parameter.' }, { status: 400 });
+    }
+
+    // --- Authentication/Authorization based on walletAddress ---
+    const normalizedWalletAddress = walletAddress.toLowerCase();
+    const user = await prisma.user.findUnique({
+      where: { walletAddress: normalizedWalletAddress },
+      select: { id: true, isPremium: true }
+    });
+
+    if (!user) {
+      console.error(`[API hedge-chat/agent] Unauthorized: User not found for wallet ${normalizedWalletAddress}.`);
+      return NextResponse.json({ error: 'Unauthorized: User not found' }, { status: 401 });
+    }
+    if (!user.isPremium) {
+      console.error(`[API hedge-chat/agent] Forbidden: User ${user.id} is not premium.`);
+      return NextResponse.json({ error: 'Forbidden: Premium access required' }, { status: 403 });
+    }
+    const userId = user.id;
+    console.log(`[API hedge-chat/agent] User ${userId} authorized (Premium: ${user.isPremium}).`);
+    // --- End Authentication/Authorization ---
 
     let hedgeConversationId = clientHedgeConversationId;
+    let conversationVerified = !hedgeConversationId;
 
-    // 1. Prepare payload for Venymio
+    if (hedgeConversationId) {
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: hedgeConversationId },
+        select: { userId: true }
+      });
+
+      if (!conversation) {
+        return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+      }
+      if (conversation.userId !== userId) {
+        console.error(`[API hedge-chat/agent] Forbidden: User ${userId} does not own conversation ${hedgeConversationId} (Owner: ${conversation.userId}).`);
+        return NextResponse.json({ error: 'Forbidden: User does not own this conversation' }, { status: 403 });
+      }
+      conversationVerified = true;
+    }
+
+    if (!conversationVerified) {
+       console.error('[API hedge-chat/agent] Conversation verification failed unexpectedly.');
+       return NextResponse.json({ error: 'Conversation verification failed.' }, { status: 500 });
+    }
+
     const venymioPayload: any = {
       message: message,
-      conversationHistory: historyForAgent || [], 
+      conversationHistory: historyForAgent || [],
     };
 
     if (venymioContextId) {
       venymioPayload.conversationId = venymioContextId;
     }
     
-    // 2. Call Venymio Agent API
     const venymioResponse = await fetch(VENYMIO_AGENT_ENDPOINT_URL, {
       method: 'POST',
       headers: {
@@ -57,52 +100,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Venymio API returned no response body' }, { status: 500 });
     }
 
-    // 3. Stream response back to hedge-ai client
     let baseStream = venymioResponse.body;
     let newHedgeConversationIdForClient: string | null = null;
 
-    // 4. Save user message and handle conversation creation
-    // This block needs to run *before* we start streaming to the client if we want to prepend an event.
     if (!hedgeConversationId) {
       const newConversation = await prisma.conversation.create({
         data: {
           title: message.substring(0, 70) + (message.length > 70 ? '...' : ''),
-          // userId: 'some_user_id', // TODO: Integrate with hedge-ai user system if available
+          userId: userId,
         },
       });
       hedgeConversationId = newConversation.id;
-      newHedgeConversationIdForClient = hedgeConversationId; // Store for prepending
-      console.log(`[API hedge-chat/agent] Created new hedge-ai conversation: ${hedgeConversationId}`);
+      newHedgeConversationIdForClient = hedgeConversationId;
+      console.log(`[API hedge-chat/agent] Created new hedge-ai conversation: ${hedgeConversationId} for user ${userId}`);
     }
 
-    // Save user message to hedge-ai DB
-    // This should happen regardless of whether it's a new or existing conversation.
-    // Ensure hedgeConversationId is valid before this.
-    if (hedgeConversationId) {
-      try {
-          await prisma.chatMessage.create({
-            data: {
+    try {
+        await prisma.chatMessage.create({
+          data: {
               content: message,
               isUserMessage: true,
-              conversationId: hedgeConversationId,
+              conversationId: hedgeConversationId!, // hedgeConversationId is guaranteed to be set
             },
           });
           console.log(`[API hedge-chat/agent] Saved user message to hedge-ai conversation: ${hedgeConversationId}`);
 
           await prisma.conversation.update({
-            where: { id: hedgeConversationId },
+            where: { id: hedgeConversationId! }, // hedgeConversationId is guaranteed to be set
             data: { updatedAt: new Date() },
           });
       } catch (dbError) {
         console.error('[API hedge-chat/agent] DB error saving user message/conversation:', dbError);
-        // Decide if we should still stream Venymio's response or return an error
       }
-    } else {
-      console.error('[API hedge-chat/agent] hedgeConversationId is null or undefined before saving user message. This should not happen.');
-      // This case implies an issue with conversation creation logic if it was a new chat.
-    }
 
-    // If a new hedge-ai conversation was created, prepend an event to the stream
     if (newHedgeConversationIdForClient && baseStream) {
       const prefixEncoder = new TextEncoder();
       const prefixEvent = `event: hedge_conversation_created\ndata: ${JSON.stringify({ hedgeConversationId: newHedgeConversationIdForClient })}\n\n`;

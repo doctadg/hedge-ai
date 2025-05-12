@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma'; // Import shared Prisma client instance
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'; // Adjust path if necessary
 
-const prisma = new PrismaClient();
+// Remove local Prisma client instantiation: const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);

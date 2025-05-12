@@ -1,60 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
+import prisma from '@/lib/prisma'; // Import Prisma client
 
 export async function POST(req: NextRequest) {
-  let client; // Declare client outside the try block
   try {
     const { walletAddress } = await req.json();
 
     if (!walletAddress) {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 });
     }
+    console.log(`[API premium] Checking premium status for wallet: ${walletAddress}`); // Added logging
 
-    const pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+    // Use Prisma to find the user by wallet address
+    const user = await prisma.user.findUnique({
+      where: {
+        walletAddress: walletAddress, // Use the field name from the Prisma schema
+      },
+      select: {
+        isPremium: true, // Select only the isPremium field
+      },
     });
+    console.log(`[API premium] User found:`, user); // Added logging
 
-    try {
-      client = await pool.connect();
-    } catch (connectionError) {
-      console.error('Error connecting to the database:', connectionError);
-      return NextResponse.json({ error: 'Database connection error', details: connectionError }, { status: 500 });
+    if (user) {
+      console.log(`[API premium] Returning isPremium: ${user.isPremium}`); // Added logging
+      return NextResponse.json({ isPremium: user.isPremium });
+    } else {
+      console.log(`[API premium] User not found, returning isPremium: false`); // Added logging
+      // User not found, default to false
+      return NextResponse.json({ isPremium: false });
     }
 
-    try {
-      // Check if the users table exists
-      const tableExistsResult = await client.query(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE  table_schema = 'public'
-          AND    table_name   = 'users'
-        );
-      `);
-
-      if (!tableExistsResult.rows[0].exists) {
-        return NextResponse.json({ error: 'Database not initialized. Please run the schema.' }, { status: 500 });
-      }
-
-      const result = await client.query(
-        'SELECT is_premium FROM users WHERE wallet_address = $1',
-        [walletAddress]
-      );
-
-      if (result.rows.length > 0) {
-        return NextResponse.json({ isPremium: result.rows[0].is_premium });
-      } else {
-        return NextResponse.json({ isPremium: false }); // User not found, default to false
-      }
-    } catch (queryError) {
-      console.error('Error executing query:', queryError);
-      return NextResponse.json({ error: 'Database query error', details: queryError }, { status: 500 });
-    } finally {
-      if (client) {
-        client.release();
-      }
-    }
   } catch (error) {
     console.error('Error checking premium status:', error);
-    return NextResponse.json({ error: 'Internal server error', details: error }, { status: 500 });
+    // Consider more specific error handling based on Prisma errors if needed
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

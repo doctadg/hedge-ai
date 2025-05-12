@@ -1,6 +1,8 @@
 'use client';
 
 import React, { createContext, useState, useContext, useCallback, useEffect, ReactNode } from 'react';
+// import { useSession } from 'next-auth/react'; // No longer using useSession here
+import { useWallet } from './WalletContext'; // Import useWallet
 
 interface Conversation {
   id: string;
@@ -26,13 +28,23 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [errorConversations, setErrorConversations] = useState<string | null>(null);
+  // const { data: session, status } = useSession(); // No longer using useSession here
+  const { account, currentUser } = useWallet(); // Get account and currentUser from WalletContext
 
   const fetchConversations = useCallback(async () => {
+    // Only fetch if account is available and user is premium
+    if (!account || !currentUser?.isPremium) {
+      console.log('[ChatContext] Wallet not connected or user not premium, skipping conversation fetch.');
+      setConversations([]);
+      setIsLoadingConversations(false);
+      return;
+    }
+
     setIsLoadingConversations(true);
     setErrorConversations(null);
-    console.log('[ChatContext] Fetching conversations...');
+    console.log(`[ChatContext] Fetching conversations for wallet: ${account}`);
     try {
-      const response = await fetch('/api/hedge-chat/history/conversations');
+      const response = await fetch(`/api/hedge-chat/history/conversations?walletAddress=${account}`);
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.error || 'Failed to fetch conversations');
@@ -50,12 +62,19 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setIsLoadingConversations(false);
     }
-  }, []);
+  }, [account, currentUser?.isPremium]); // Add account and currentUser.isPremium to dependencies
 
-  // Fetch conversations on initial load
+  // Fetch conversations when account or premium status changes
   useEffect(() => {
-    fetchConversations();
-  }, [fetchConversations]);
+    if (account && currentUser?.isPremium) {
+      console.log('[ChatContext] Account connected and user is premium, triggering conversation fetch.');
+      fetchConversations();
+    } else {
+      console.log('[ChatContext] Account not connected or user not premium - clearing conversations.');
+      setConversations([]);
+      setCurrentConversationId(null);
+    }
+  }, [account, currentUser?.isPremium, fetchConversations]);
 
   const selectConversation = (conversationId: string) => {
     console.log('[ChatContext] Selecting conversation:', conversationId);

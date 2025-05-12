@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react'; // Import Suspense
 import { signIn } from 'next-auth/react';
 import { useWallet } from '@/contexts/WalletContext'; // Your existing wallet context
 import { Button } from '@/components/ui/button';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function AdminLoginPage() {
+// Renamed the component and removed 'export default'
+function AdminLoginContent() { 
   const { account, connect: connectWallet, isConnected } = useWallet();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -86,4 +87,13 @@ export default function AdminLoginPage() {
       </div>
     </div>
   );
+}
+
+// This remains the default export, rendering the renamed component within Suspense
+export default function AdminLoginPageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <AdminLoginContent /> 
+    </Suspense>
+  )
 }

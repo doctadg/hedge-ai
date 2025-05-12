@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+// Removed getServerSession and authOptions imports
+import prisma from '@/lib/prisma'; // Import shared Prisma client instance
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { 
-      hedgeConversationId, 
-      agentContent, 
-      thoughts,       // Expected as a single string (e.g., joined by \n\n)
-      toolStatus      // Expected as a JSON string
+    const {
+      hedgeConversationId,
+      agentContent,
+      thoughts,
+      toolStatus,
+      walletAddress // Expect walletAddress from the client
     } = body;
 
+    if (!walletAddress || typeof walletAddress !== 'string') {
+      return NextResponse.json({ error: 'Missing or invalid walletAddress parameter.' }, { status: 400 });
+    }
     if (!hedgeConversationId) {
       return NextResponse.json({ error: 'Missing required parameter: hedgeConversationId' }, { status: 400 });
     }
@@ -20,10 +23,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing or invalid agentContent' }, { status: 400 });
     }
 
-    // TODO: Add user authentication/authorization here if needed,
-    // to ensure the user making this request owns the conversation or has rights to modify it.
-    // For now, assuming client-side logic correctly passes the conversation ID.
+    // --- Authentication/Authorization based on walletAddress ---
+    const normalizedWalletAddress = walletAddress.toLowerCase();
+    const user = await prisma.user.findUnique({
+      where: { walletAddress: normalizedWalletAddress },
+      select: { id: true, isPremium: true } // Also check for premium if this route requires it
+    });
 
+    if (!user) {
+      console.error(`[API save-agent-message] Unauthorized: User not found for wallet ${normalizedWalletAddress}.`);
+      return NextResponse.json({ error: 'Unauthorized: User not found' }, { status: 401 });
+    }
+    // Assuming premium is required to save agent messages, similar to creating them
+    if (!user.isPremium) {
+        console.error(`[API save-agent-message] Forbidden: User ${user.id} is not premium.`);
+        return NextResponse.json({ error: 'Forbidden: Premium access required' }, { status: 403 });
+    }
+    const userId = user.id;
+    console.log(`[API save-agent-message] User ${userId} authorized (Premium: ${user.isPremium}).`);
+    // --- End Authentication/Authorization ---
+
+    // Verify user owns the conversation
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: hedgeConversationId },
+      select: { userId: true }
+    });
+
+    if (!conversation) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+    }
+
+    if (conversation.userId !== userId) { // Compare against userId from walletAddress lookup
+      console.error(`[API save-agent-message] Forbidden: User ${userId} does not own conversation ${hedgeConversationId}.`);
+      return NextResponse.json({ error: 'Forbidden: User does not own this conversation' }, { status: 403 });
+    }
+
+    // User is authorized, proceed to save the message
     const agentMessage = await prisma.chatMessage.create({
       data: {
         content: agentContent,
