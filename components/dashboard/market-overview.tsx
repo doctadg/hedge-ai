@@ -2,62 +2,110 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { fetchTrendingCoins, fetchCoinCategories, fetchDerivativesExchanges } from "@/utils/api"
+import {
+  fetchCoinGeckoTrending,
+  fetchCoinGeckoCategories,
+  fetchCoinGeckoDerivativesExchanges,
+} from "@/utils/api"
+
+// Define interfaces similar to the other market-overview component for consistency
+interface TrendingCoinItem {
+  id: string;
+  coin_id: number; // Unused in this component's render but part of CG structure
+  name: string;
+  symbol: string;
+  market_cap_rank?: number; // Unused
+  thumb: string;
+  small: string;
+  large?: string; // Unused
+  slug?: string; // Unused
+  price_btc?: number; // Unused
+  score?: number; // Unused
+}
+
+interface TrendingCoin {
+  item: TrendingCoinItem;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  market_cap?: number; // Unused
+  market_cap_change_24h: number | null; // Can be null from CoinGecko
+  top_3_coins?: string[]; // Unused
+  content?: string; // Unused
+  volume_24h?: number; // Unused
+}
+
+interface DerivativesExchange {
+  id: string;
+  name: string;
+  open_interest_btc: number | null;
+  trade_volume_24h_btc?: string; // Unused in this component's render
+  number_of_perpetual_pairs?: number; // Unused
+  number_of_futures_pairs?: number; // Unused
+  image?: string; // Unused
+}
+
 
 export function MarketOverview() {
-  const [trendingCoins, setTrendingCoins] = useState([])
-  const [topCategories, setTopCategories] = useState([])
-  const [derivativesExchanges, setDerivativesExchanges] = useState([])
+  const [trendingCoins, setTrendingCoins] = useState<TrendingCoin[]>([])
+  const [topCategories, setTopCategories] = useState<Category[]>([])
+  const [derivativesExchanges, setDerivativesExchanges] = useState<DerivativesExchange[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null) // Ensure error state can hold string messages
 
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
-      setError(null)
+    async function loadData() {
+      setLoading(true);
+      setError(null);
       try {
-        const [trendingData, categoriesData, derivativesData] = await Promise.all([
-          fetchTrendingCoins(),
-          fetchCoinCategories(),
-          fetchDerivativesExchanges(),
-        ])
+        const [trendingResponse, categoriesResponse, derivativesResponse] = await Promise.all([
+          fetchCoinGeckoTrending(),
+          fetchCoinGeckoCategories({ order: "market_cap_desc" }),
+          fetchCoinGeckoDerivativesExchanges({ order: "open_interest_btc_desc", per_page: 5 }), // Fetch top 5
+        ]);
 
-        if (trendingData && trendingData.coins && Array.isArray(trendingData.coins)) {
-          setTrendingCoins(trendingData.coins.slice(0, 5))
+        // Trending coins from CoinGecko are nested under 'coins'
+        if (trendingResponse && trendingResponse.coins && Array.isArray(trendingResponse.coins)) {
+          setTrendingCoins(trendingResponse.coins.slice(0, 5));
         } else {
-          console.error("Invalid trending coins data:", trendingData)
-          setTrendingCoins([])
+          console.warn("Trending coins data is not in expected format:", trendingResponse);
+          setTrendingCoins([]);
         }
 
-        if (Array.isArray(categoriesData)) {
-          setTopCategories(categoriesData.slice(0, 5))
+        // Categories data from CoinGecko is an array
+        if (Array.isArray(categoriesResponse)) {
+          setTopCategories(categoriesResponse.slice(0, 5));
         } else {
-          console.error("Invalid categories data:", categoriesData)
-          setTopCategories([])
+          console.warn("Categories data is not in expected format:", categoriesResponse);
+          setTopCategories([]);
+        }
+        
+        // Derivatives exchanges data from CoinGecko is an array
+        if (Array.isArray(derivativesResponse)) {
+          setDerivativesExchanges(derivativesResponse.slice(0,5)); // Already fetched 5
+        } else {
+          console.warn("Derivatives exchanges data is not in expected format:", derivativesResponse);
+          setDerivativesExchanges([]);
         }
 
-        if (Array.isArray(derivativesData)) {
-          setDerivativesExchanges(derivativesData.slice(0, 5))
-        } else {
-          console.error("Invalid derivatives exchanges data:", derivativesData)
-          setDerivativesExchanges([])
-        }
-      } catch (error) {
-        console.error("Error fetching market overview data:", error)
-        setError(`Failed to load market overview: ${error.message}`)
+      } catch (err: any) {
+        console.error("Error fetching dashboard market overview data:", err);
+        setError(`Failed to load market overview: ${err.message || "Unknown error"}`);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
-    fetchData()
-  }, [])
+    loadData();
+  }, []);
 
   if (loading) {
-    return <div className="text-white">Loading market overview...</div>
+    return <div className="text-white text-center py-10">Loading market overview...</div>;
   }
 
   if (error) {
-    return <div className="text-red-500">{error}</div>
+    return <div className="text-red-500 text-center py-10">{error}</div>;
   }
 
   return (
@@ -73,18 +121,18 @@ export function MarketOverview() {
                 <li key={coin.item.id} className="flex items-center justify-between">
                   <div className="flex items-center">
                     <img
-                      src={coin.item.small || "/placeholder.svg"}
+                      src={coin.item.small || coin.item.thumb || "/placeholder.svg"}
                       alt={coin.item.name}
                       className="h-6 w-6 rounded-full mr-2"
                     />
                     <span className="text-white">{coin.item.name}</span>
                   </div>
-                  <span className="text-sm text-gray-400">{coin.item.symbol}</span>
+                  <span className="text-sm text-gray-400">{coin.item.symbol.toUpperCase()}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-gray-400">No trending coins available</p>
+            <p className="text-gray-400">No trending coins available.</p>
           )}
         </CardContent>
       </Card>
@@ -99,14 +147,22 @@ export function MarketOverview() {
               {topCategories.map((category) => (
                 <li key={category.id} className="flex items-center justify-between">
                   <span className="text-white">{category.name}</span>
-                  <span className={category.market_cap_change_24h >= 0 ? "text-green-500" : "text-red-500"}>
-                    {category.market_cap_change_24h.toFixed(2)}%
+                  <span 
+                    className={
+                      category.market_cap_change_24h !== null && category.market_cap_change_24h >= 0 
+                        ? "text-green-500" 
+                        : "text-red-500"
+                    }
+                  >
+                    {category.market_cap_change_24h !== null && category.market_cap_change_24h !== undefined
+                      ? `${category.market_cap_change_24h.toFixed(2)}%`
+                      : 'N/A'}
                   </span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-gray-400">No categories available</p>
+            <p className="text-gray-400">No categories available.</p>
           )}
         </CardContent>
       </Card>
@@ -119,18 +175,19 @@ export function MarketOverview() {
           {derivativesExchanges.length > 0 ? (
             <ul className="space-y-2">
               {derivativesExchanges.map((exchange) => (
-                <li key={exchange.id} className="flex items-center justify-between">
+                <li key={exchange.id} className="flex items-center justify-between"> {/* Use exchange.id from CoinGecko */}
                   <span className="text-white">{exchange.name}</span>
-                  <span className="text-sm text-gray-400">{exchange.open_interest_btc.toFixed(2)} BTC</span>
+                  <span className="text-sm text-gray-400">
+                    {exchange.open_interest_btc ? `${exchange.open_interest_btc.toFixed(2)} BTC` : 'N/A'}
+                  </span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-gray-400">No derivatives exchanges available</p>
+            <p className="text-gray-400">No derivatives exchanges available.</p>
           )}
         </CardContent>
       </Card>
     </div>
   )
 }
-

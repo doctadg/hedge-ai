@@ -47,40 +47,7 @@ export async function GET(request: Request) {
     let data
     switch (endpoint) {
       case "global":
-        // Try Venym API for global data
-        const cryptoDataRes = await fetch("https://venym.io/api/crypto")
-        if (!cryptoDataRes.ok) {
-          throw new Error(
-            `Venym API request failed: ${cryptoDataRes.status} ${cryptoDataRes.statusText}`,
-          );
-        }
-        const cryptoDataString = await cryptoDataRes.text(); // Get raw text first
-        let cryptoData;
-        try {
-           cryptoData = JSON.parse(cryptoDataString).crypto; // Parse the JSON string *once*
-        } catch (parseError) {
-          console.error("Error parsing Venym /api/crypto response:", parseError);
-          console.error("Raw response:", cryptoDataString);
-          return NextResponse.json(
-            {
-              error: "Failed to parse Venym /api/crypto response",
-              rawResponse: cryptoDataString,
-            },
-            { status: 500 },
-          );
-        }
-
-        interface GlobalData {
-          Coins: string;
-          Exchanges: string;
-          "Market Cap": string;
-          "Market Cap Change": string;
-          "24h Volume": string;
-          "BTC Dominance": string;
-          "ETH Dominance": string;
-          "Gas Fees": string;
-        }
-        data = cryptoData as GlobalData;
+        data = await fetchFromAPI(`${COINGECKO_API_URL}/global`);
         break;
       case "trending_searches":
         data = await fetchFromAPI(`${COINGECKO_API_URL}/search/trending`);
@@ -109,36 +76,23 @@ export async function GET(request: Request) {
         total_volume: { btc: number; usd: number };
         ath: { usd: number };
         market_cap: { usd: number };
-        circulating_supply: number;
-        price_change_percentage_24h: number;
       }
+      // Removed the MarketData interface definition as it's no longer directly used here
 
       case "coin":
-        const bitcoinDataRes = await fetch("https://venym.io/api/bitcoin");
-        if (!bitcoinDataRes.ok) {
-          throw new Error(
-            `Venym API request failed: ${bitcoinDataRes.status} ${bitcoinDataRes.statusText}`,
-          );
+        // Fetch Bitcoin market data from CoinGecko
+        data = await fetchFromAPI(
+          `${COINGECKO_API_URL}/coins/markets?vs_currency=usd&ids=bitcoin`,
+        );
+        // The result is an array, we take the first element for Bitcoin
+        if (Array.isArray(data) && data.length > 0) {
+          data = data[0];
+        } else {
+          // Handle case where Bitcoin data might not be returned
+          console.warn("Bitcoin data not found in CoinGecko response for /coins/markets");
+          data = null; // Or set a default structure if needed
         }
-        const bitcoinDataString = await bitcoinDataRes.text();
-        const bitcoinData = JSON.parse(JSON.parse(bitcoinDataString).bitcoin);
-        // Extract values and create a structure similar to CoinGecko
-        console.log(bitcoinData);
-        data = {
-          market_data: {
-            high_24h: { usd: parseFloat(bitcoinData["24h High"]?.replace(/[^0-9.-]+/g,"")) || 0 },
-            low_24h: { usd: parseFloat(bitcoinData["24h Low"]?.replace(/[^0-9.-]+/g,"")) || 0 },
-            total_volume: {
-              btc: parseFloat(bitcoinData["24h Trading Volume"]?.replace(/[^0-9.-]+/g,"") / parseFloat(bitcoinData["Bitcoin Price"]?.replace(/[^0-9.-]+/g,""))) || 0 as number,
-              usd: parseFloat(bitcoinData["24h Trading Volume"]?.replace(/[^0-9.-]+/g,"")) || 0 as number,
-            },
-            ath: { usd: 0 }, // No ATH data from Venym
-            market_cap: { usd: parseFloat(bitcoinData["Market Cap"]?.replace(/[^0-9.-]+/g,"")) || 0 },
-            circulating_supply: parseFloat(bitcoinData["Circulating Supply"]?.replace(/[^0-9.-]+/g,"")) || 0,
-            price_change_percentage_24h: parseFloat(bitcoinData["24h Change"]?.replace(/[^0-9.-]+/g,"")) || 0,
-          },
-        } as { market_data: MarketData };
-    break;
+        break;
       case "chart":
         const coinIdChart = searchParams.get("coinId")
         const days = searchParams.get("days")

@@ -6,7 +6,7 @@ async function handleApiResponse(response: Response) {
   return response.json()
 }
 
-const API_BASE_URL = "/api/data"
+const API_BASE_URL = "/api/data" // Old base URL for existing functions
 
 async function fetchData(endpoint: string, params: Record<string, string> = {}) {
   const searchParams = new URLSearchParams({ endpoint, ...params })
@@ -96,4 +96,78 @@ export async function fetchDerivativesExchanges() {
 
 export async function fetchGlobalDefiData() {
   return fetchData("defi")
+}
+
+// --- New CoinGecko API utility functions ---
+const CG_API_BASE_URL = "/api/coingecko";
+
+async function fetchCg(endpoint: string, params?: Record<string, string | number | boolean>) {
+  const urlParams = new URLSearchParams();
+  if (params) {
+    for (const key in params) {
+      if (params[key] !== undefined) {
+        urlParams.append(key, String(params[key]));
+      }
+    }
+  }
+  const queryString = urlParams.toString();
+  const fullUrl = `${CG_API_BASE_URL}${endpoint}${queryString ? `?${queryString}` : ''}`;
+  
+  const response = await fetch(fullUrl);
+  return handleApiResponse(response); // Reusing the existing handler
+}
+
+export async function fetchCoinGeckoGlobal() {
+  return fetchCg("/global");
+}
+
+export async function fetchCoinGeckoGlobalDefi() {
+  return fetchCg("/global_defi");
+}
+
+export interface FetchCoinGeckoMarketsParams {
+  vs_currency?: string;
+  ids?: string; // Comma-separated string of coin ids
+  category?: string;
+  order?: string;
+  per_page?: number;
+  page?: number;
+  sparkline?: boolean;
+  price_change_percentage?: string;
+  locale?: string;
+  precision?: string;
+}
+export async function fetchCoinGeckoMarkets(params?: FetchCoinGeckoMarketsParams) {
+  return fetchCg("/markets", params as Record<string, string | number | boolean> | undefined);
+}
+
+export async function fetchCoinGeckoTrending() {
+  return fetchCg("/trending");
+}
+
+export interface FetchCoinGeckoCategoriesParams {
+  order?: string;
+}
+export async function fetchCoinGeckoCategories(params?: FetchCoinGeckoCategoriesParams) {
+  return fetchCg("/categories", params as Record<string, string | number | boolean> | undefined);
+}
+
+export interface FetchCoinGeckoDerivativesExchangesParams {
+  order?: string;
+  per_page?: number;
+  page?: number;
+}
+export async function fetchCoinGeckoDerivativesExchanges(params?: FetchCoinGeckoDerivativesExchangesParams) {
+  return fetchCg("/derivatives_exchanges", params as Record<string, string | number | boolean> | undefined);
+}
+
+export interface FetchCoinGeckoCoinMarketChartParams {
+  id: string; // Coin ID
+  vs_currency?: string;
+  days: string | number; // e.g., 1, 7, "max"
+  interval?: "daily";
+  precision?: string;
+}
+export async function fetchCoinGeckoCoinMarketChart(params: FetchCoinGeckoCoinMarketChartParams) {
+  return fetchCg("/coin_market_chart", params as unknown as Record<string, string | number | boolean>);
 }

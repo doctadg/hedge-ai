@@ -40,7 +40,7 @@ export function SiteHeader() {
             >
               Sign in
             </Button>
-            <Button 
+            <Button
               variant="default"
               className="bg-green-500 text-sm font-medium text-white hover:bg-green-600"
             >
@@ -52,4 +52,3 @@ export function SiteHeader() {
     </header>
   )
 }
-

@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Optional User model - adjust as needed for your application's user management
+// If you don't have user accounts yet, you can omit this or simplify it.
+model User {
+  id            String       @id @default(cuid())
+  walletAddress String?      @unique // Added wallet address
+  email         String?      @unique // Example field
+  name          String?      // Example field
+  isPremium     Boolean      @default(false) // Added premium status
+  isAdmin       Boolean      @default(false) // Added admin status
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  conversations Conversation[]
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  title         String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  messages      ChatMessage[]
+  userId        String?   // Foreign key to User model
+  user          User?     @relation(fields: [userId], references: [id])
+  venymioConversationId String?   @unique // Optional: To store Venymio's conversation ID if needed
+}
+
+model ChatMessage {
+  id              String      @id @default(cuid())
+  content         String      @db.Text
+  isUserMessage   Boolean
+  createdAt       DateTime    @default(now())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  // Optional fields for agent's messages
+  toolUsed        String?
+  toolStatus      String?     // e.g., "running", "completed", "failed"
+  thoughts        String?     @db.Text // Can store JSON string or concatenated thoughts
+}

@@ -5,6 +5,7 @@ import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import type React from "react";
 import { useDashboardAccess } from "@/hooks/useDashboardAccess";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ChatProvider } from "@/contexts/ChatContext"; // Import ChatProvider
 
 export default function DashboardLayout({
   children,
@@ -16,8 +17,10 @@ export default function DashboardLayout({
   return (
     <div className="flex flex-col min-h-screen bg-black">
       <DashboardTopBar />
-      <Dialog open={isOpen} onOpenChange={onOpenChange} className="data-[state=open]:bg-black/95">
-        <DialogContent className="sm:max-w-[425px]">
+      {/* Removed className from Dialog */}
+      <Dialog open={isOpen} onOpenChange={onOpenChange}> 
+        {/* Added className to DialogContent */}
+        <DialogContent className="sm:max-w-[425px] data-[state=open]:bg-black/95"> 
           <DialogHeader>
             <DialogTitle>Premium Access Required</DialogTitle>
             <DialogDescription>
@@ -30,10 +33,14 @@ export default function DashboardLayout({
           </div>
         </DialogContent>
       </Dialog>
-      <div className="flex flex-1">
-        <DashboardSidebar />
-        <main className="flex-1 overflow-auto p-6">{children}</main>
-      </div>
+      {/* Wrap the sidebar and main content with ChatProvider */}
+      <ChatProvider>
+        <div className="flex flex-1 overflow-hidden"> {/* Added overflow-hidden here */}
+          <DashboardSidebar />
+          {/* Removed overflow-auto from main, let children handle scroll */}
+          <main className="flex-1 p-6">{children}</main> 
+        </div>
+      </ChatProvider>
     </div>
   );
 }

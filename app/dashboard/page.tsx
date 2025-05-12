@@ -4,104 +4,54 @@ import { DashboardChart } from "@/components/dashboard/chart"
 import { DashboardMetrics } from "@/components/dashboard/metrics"
 import { MarketOverview } from "@/components/dashboard/market-overview"
 import { LivePrice } from "@/components/dashboard/live-price"
-import { LoginModal } from "@/components/ui/LoginModal"
-import { useEffect, useState } from "react"
-import Web3 from "web3"
-import { ConnectButton } from "@/components/ConnectButton"
-import { isPremiumUser } from "@/utils/isPremiumUser"
+// LoginModal and ConnectButton are no longer needed here as auth is handled by middleware and context
+// Web3, isPremiumUser are also not needed directly here
+import { useEffect, useState } from "react" // Keep for hasMounted if still desired for other reasons
+import { useWallet } from "@/contexts/WalletContext" // Import the refactored context hook
 
 export default function DashboardPage() {
-  const [isConnected, setIsConnected] = useState(false)
-  const [account, setAccount] = useState<string | null>(null)
+  const { status, account, isPremium } = useWallet(); // Use values from context
   const [hasMounted, setHasMounted] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // Add loading state
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
-  useEffect(() => {
-    const checkConnection = async () => {
-      if (typeof window !== "undefined" && window.ethereum) {
-        const web3 = new Web3(window.ethereum)
-        try {
-          const accounts = await web3.eth.getAccounts()
-          if (accounts.length > 0) {
-            setIsConnected(true)
-            setAccount(accounts[0])
-          }
-        } catch (error) {
-          console.error("Error checking wallet connection:", error)
-        }
-      }
-    }
-
-    checkConnection()
-  }, [])
-
-  const connect = async () => {
-    if (typeof window !== "undefined" && window.ethereum) {
-      try {
-        await window.ethereum.request({ method: "eth_requestAccounts" })
-        const web3 = new Web3(window.ethereum)
-        const accounts = await web3.eth.getAccounts()
-        setIsConnected(true)
-        setAccount(accounts[0])
-      } catch (error) {
-        console.error("Error connecting to wallet:", error)
-      }
-    } else {
-      console.error("Ethereum object not found, do you have MetaMask installed?")
-    }
-  }
-
-  const disconnect = () => {
-    setIsConnected(false)
-    setAccount(null)
-  }
-
-    useEffect(() => {
-    const checkPremiumStatus = async () => {
-      if (account) {
-        const premium = await isPremiumUser(account);
-        setIsLoading(false); // Set loading to false after fetching
-        setIsPremium(premium);
-      }
-    };
-
-    checkPremiumStatus();
-  }, [account]);
-
   if (!hasMounted) {
+    // This can help prevent hydration mismatches if needed,
+    // but with proper session handling, might not be strictly necessary for auth.
     return null;
   }
+
+  // Middleware now handles redirection if not authenticated.
+  // The WalletContext provides the status: 'loading', 'authenticated', 'unauthenticated'.
+  // The useDashboardAccess hook (in layout) handles premium modal for restricted pages.
+  // This page is the main dashboard overview, accessible to all authenticated users.
+
+  if (status === 'loading') {
+    return <div>Loading session...</div>; // Or a more sophisticated loading spinner
+  }
+
+  if (status === 'unauthenticated') {
+    // This case should ideally be handled by middleware redirecting to login.
+    // If middleware is correctly configured, users shouldn't reach here unauthenticated.
+    // However, as a fallback or for direct navigation attempts:
+    return <div>Please log in to view the dashboard.</div>; // Or redirect to login page
+  }
+  
+  // At this point, status === 'authenticated'
+  // The premium check for *this specific page* (overview) is not required,
+  // as it's accessible to all logged-in users.
+  // The useDashboardAccess hook in the layout handles premium checks for other sub-pages.
 
   return (
     <div className="space-y-6">
       <div className="w-full">
-        {!isConnected ? (
-          <LoginModal isOpen={!isConnected}>
-            <ConnectButton
-              isConnected={isConnected}
-              connect={connect}
-              disconnect={disconnect}
-            />
-          </LoginModal>
-        ) : (
-          <>
-            {isLoading ? (
-              <div>Loading...</div> // Show loading indicator
-            ) : (
-              <>
-                <LivePrice />
-                <DashboardChart />
-                <DashboardMetrics />
-                <MarketOverview />
-              </>
-            )}
-          </>
-        )}
+        {/* Content for authenticated users */}
+        <LivePrice />
+        <DashboardChart />
+        <DashboardMetrics />
+        <MarketOverview />
       </div>
     </div>
   )

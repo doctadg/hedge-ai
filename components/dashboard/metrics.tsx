@@ -33,70 +33,73 @@ export function DashboardMetrics() {
         }
 
         const globalData = await globalRes.json();
-        const coinData = await coinRes.json();
-        console.log('globalData', globalData)
-        console.log('coinData', coinData)
+        const coinData = await coinRes.json(); // This is now Bitcoin data from /coins/markets
+        console.log('globalData (CoinGecko)', globalData)
+        console.log('coinData (CoinGecko Bitcoin)', coinData)
+
+        // Helper function for safe formatting
+        const formatNumber = (num: number | undefined | null, options: Intl.NumberFormatOptions = {}) => {
+          if (num === undefined || num === null || isNaN(num)) return "N/A";
+          return num.toLocaleString("en-US", options);
+        };
+
+        const formatCurrency = (num: number | undefined | null, options: Intl.NumberFormatOptions = {}) => {
+          if (num === undefined || num === null || isNaN(num)) return "N/A";
+          // Abbreviation logic
+          if (num >= 1e12) { // Trillions
+            return `$${(num / 1e12).toFixed(2)}T`;
+          } else if (num >= 1e9) { // Billions
+            return `$${(num / 1e9).toFixed(2)}B`;
+          } else if (num >= 1e6) { // Millions
+            return `$${(num / 1e6).toFixed(2)}M`;
+          } else { // Less than a million
+            return `$${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2, ...options })}`;
+          }
+        };
+
+        const formatPercentage = (num: number | undefined | null) => {
+          if (num === undefined || num === null || isNaN(num)) return "N/A";
+          return `${num.toFixed(2)}%`;
+        };
+
         const newMetrics = [
-          { label: "COINS", value: globalData?.Coins || "N/A" },
-          { label: "EXCHANGES", value: globalData?.Exchanges || "N/A" },
+          { label: "COINS", value: formatNumber(globalData?.data?.active_cryptocurrencies) },
+          { label: "EXCHANGES", value: formatNumber(globalData?.data?.markets) },
+          // { // BTC Volume for just Bitcoin isn't directly available here, removing for now
+          //   label: "24H VOL (BTC)",
+          //   value: "N/A", // Need to calculate or find another endpoint if required
+          // },
           {
-            label: "24H VOL (BTC)",
-            value: coinData?.market_data.total_volume.btc.toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }) ?? "N/A",
+            label: "BTC 24H VOL (USD)", // Renamed for clarity
+            value: formatCurrency(coinData?.total_volume),
           },
           {
-            label: "24H VOL (USD)",
-            value: coinData?.market_data.total_volume.usd
-              ? `$${coinData.market_data.total_volume.usd.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}`
-              : "N/A",
-          },
-          { label: "ATH (USD)", value: `$0` }, // No ATH from Venym
-          {
-            label: "MARKET CAP",
-            value: coinData?.market_data.market_cap.usd
-              ? `$${coinData.market_data.market_cap.usd.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}`
-              : "N/A",
+            label: "BTC ATH (USD)", // Renamed for clarity
+            value: formatCurrency(coinData?.ath),
           },
           {
-            label: "CIRCULATING SUPPLY",
-            value:
-              coinData?.market_data.circulating_supply.toLocaleString("en-US", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              }) ?? "N/A",
+            label: "BTC MARKET CAP", // Renamed for clarity
+            value: formatCurrency(coinData?.market_cap),
+          },
+          {
+            label: "BTC CIRCULATING SUPPLY", // Renamed for clarity
+            value: formatNumber(coinData?.circulating_supply, { maximumFractionDigits: 0 }),
           },
           {
             label: "BTC DOMINANCE",
-            value: globalData?.["BTC Dominance"]
-              ? `${parseFloat(globalData["BTC Dominance"]?.replace(/[^0-9.-]+/g, "")).toFixed(2)}%`
-              : "N/A",
+            value: formatPercentage(globalData?.data?.market_cap_percentage?.btc),
           },
           {
             label: "TOTAL MARKET CAP",
-            value: globalData?.["Market Cap"]
-              ? `$${parseFloat(globalData["Market Cap"]?.replace(/[^0-9.-]+/g, "")).toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}`
-              : "N/A",
+            value: formatCurrency(globalData?.data?.total_market_cap?.usd),
           },
           {
             label: "ETH DOMINANCE",
-            value: globalData?.["ETH Dominance"]
-              ? `${parseFloat(globalData["ETH Dominance"]?.replace(/[^0-9.-]+/g, "")).toFixed(2)}%`
-              : "N/A",
+            value: formatPercentage(globalData?.data?.market_cap_percentage?.eth),
           },
         ];
         setMetrics(newMetrics);
-        console.log("Metrics after update:", newMetrics);
+        console.log("Metrics after update (CoinGecko):", newMetrics);
       } catch (error) {
         console.error("Error fetching metrics data:", error);
         setError("Failed to load metrics. Please try again later.");

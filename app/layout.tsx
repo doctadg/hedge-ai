@@ -4,6 +4,7 @@ import "./globals.css"
 
 import { ThemeProvider } from "@/components/theme-provider"
 import { WalletProvider } from "@/contexts/WalletContext"
+import AuthProvider from "@/components/auth/AuthProvider" // Import AuthProvider
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -20,13 +21,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/hedgelogo.png" sizes="any" />
       </head>
-      <WalletProvider>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-          <body className={inter.className}>{children}</body>
-        </ThemeProvider>
-      </WalletProvider>
+      <AuthProvider> {/* Wrap with AuthProvider */}
+        <WalletProvider>
+          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+            <body className={inter.className}>{children}</body>
+          </ThemeProvider>
+        </WalletProvider>
+      </AuthProvider>
     </html>
   )
 }
