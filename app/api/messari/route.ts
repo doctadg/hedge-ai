@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server"
 import { fetchWithAuth, getApiKey } from "../utils"
 
-export const dynamic = 'force-dynamic';
-
 export async function GET() {
   try {
     const apiKey = getApiKey("MESSARI_API_KEY")
@@ -14,3 +12,4 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch data" }, { status: 500 })
   }
 }
+

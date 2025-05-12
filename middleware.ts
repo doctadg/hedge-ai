@@ -47,6 +47,5 @@ export const config = {
   matcher: [
     '/admin/:path*', // Protect all routes under /admin
     '/api/admin/:path*', // Protect all API routes under /api/admin
-    '/dashboard/:path*', // Protect all routes under /dashboard
   ],
 };

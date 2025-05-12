@@ -1,8 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
 import { fetchCoinGeckoData } from "../utils"; // Points to app/api/coingecko/utils.ts
 
-export const dynamic = 'force-dynamic';
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);

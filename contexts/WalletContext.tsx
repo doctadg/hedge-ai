@@ -1,111 +1,124 @@
 "use client"
 
-import type React from "react";
-import { createContext, useContext, useCallback } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
-import type { Session } from "next-auth"; // Import Session type
-import Web3 from "web3";
+import type React from "react"
+import { createContext, useContext, useState, useEffect } from "react"
+import Web3 from "web3"
 
-// Define the structure of the user object within the session
-// Ensure this matches the structure defined in the NextAuth callbacks
-interface SessionUser {
-  id?: string;
-  name?: string | null;
-  email?: string | null;
-  image?: string | null;
-  walletAddress?: string | null;
-  isPremium?: boolean;
-  isAdmin?: boolean;
+interface UserDetails {
+  id: string;
+  walletAddress: string | null;
+  isPremium: boolean;
+  isAdmin: boolean;
 }
 
-// Define the structure of the session object provided by useSession
-interface CustomSession extends Session {
-  user?: SessionUser;
-}
-
-// Define the context type
 interface WalletContextType {
-  session: CustomSession | null; // The session object from NextAuth
-  status: 'loading' | 'authenticated' | 'unauthenticated'; // Session status
-  connect: () => Promise<void>; // Function to initiate connection and sign-in
-  disconnect: () => Promise<void>; // Function to sign out
-  account: string | null; // Wallet address from session
-  isPremium: boolean; // Derived premium status
-  isAdmin: boolean; // Derived admin status
+  isConnected: boolean
+  connect: () => Promise<void>
+  disconnect: () => void
+  account: string | null
+  currentUser: UserDetails | null; // Added currentUser
 }
 
-const WalletContext = createContext<WalletContextType | undefined>(undefined);
+const WalletContext = createContext<WalletContextType | undefined>(undefined)
+console.log("WalletContext:", WalletContext)
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession();
+  const [isConnected, setIsConnected] = useState(false)
+  const [account, setAccount] = useState<string | null>(null)
+  const [currentUser, setCurrentUser] = useState<UserDetails | null>(null); // Added currentUser state
 
-  // Cast session data to our custom type
-  const customSession = session as CustomSession | null;
+  useEffect(() => {
+    const checkConnection = async () => {
+      if (typeof window !== "undefined" && window.ethereum) {
+        const web3 = new Web3(window.ethereum)
+        try {
+          const accounts = await web3.eth.getAccounts()
+          if (accounts.length > 0) {
+            setIsConnected(true)
+            setAccount(accounts[0])
+            await registerUserWallet(accounts[0]); // Register on initial check
+          } else {
+            // No accounts found, ensure local state is cleared
+            setIsConnected(false);
+            setAccount(null);
+            setCurrentUser(null);
+          }
+        } catch (error) {
+          console.error("Error checking wallet connection:", error)
+          setIsConnected(false);
+          setAccount(null);
+          setCurrentUser(null);
+        }
+      }
+    }
 
-  const connect = useCallback(async () => {
+    checkConnection()
+  }, [])
+
+  const connect = async () => {
     if (typeof window !== "undefined" && window.ethereum) {
       try {
-        // Request account access if needed
-        const accounts = await (window.ethereum as any).request({ method: "eth_requestAccounts" });
-        if (accounts && accounts.length > 0) {
-          const walletAddress = accounts[0];
-          // Trigger NextAuth sign-in with the wallet address
-          // Using redirect: false to handle the flow without a full page reload
-          const result = await signIn('credentials', {
-            walletAddress: walletAddress,
-            redirect: false,
-          });
-
-          if (result?.error) {
-            console.error("Sign-in error:", result.error);
-            // Handle sign-in error (e.g., show a toast notification)
-          } else {
-            console.log("Sign-in successful");
-            // Session will automatically update via useSession hook
-          }
-        } else {
-           console.error("No accounts found after requesting.");
-        }
+        await window.ethereum.request({ method: "eth_requestAccounts" })
+        const web3 = new Web3(window.ethereum)
+        const accounts = await web3.eth.getAccounts()
+        setIsConnected(true)
+        setAccount(accounts[0])
+        await registerUserWallet(accounts[0]); // Register on connect
       } catch (error) {
-        console.error("Error connecting wallet or signing in:", error);
-        // Handle connection error
+        console.error("Error connecting to wallet:", error)
       }
     } else {
-      console.error("Ethereum object not found (MetaMask not installed or enabled?)");
-      // Handle missing provider error
+      console.error("Ethereum object not found, do you have MetaMask installed?")
     }
-  }, []);
+  }
 
-  const disconnect = useCallback(async () => {
-    // Trigger NextAuth sign-out
-    await signOut({ redirect: false }); // redirect: false prevents page reload
-    console.log("Signed out");
-  }, []);
-
-  // Derive account, isPremium, isAdmin from the session object
-  const account = customSession?.user?.walletAddress ?? null;
-  const isPremium = customSession?.user?.isPremium ?? false;
-  const isAdmin = customSession?.user?.isAdmin ?? false;
-
-  const value: WalletContextType = {
-    session: customSession,
-    status,
-    connect,
-    disconnect,
-    account,
-    isPremium,
-    isAdmin,
+  const registerUserWallet = async (walletAddress: string) => {
+    if (!walletAddress) return;
+    try {
+      const response = await fetch('/api/auth/register-wallet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ walletAddress }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        console.error("Error registering wallet:", data.error || 'Unknown error');
+      } else {
+        console.log("Wallet registered/verified:", data.message, data.user);
+        console.log("Wallet registered/verified:", data.message, data.user);
+        if (data.user) {
+          setCurrentUser({
+            id: data.user.id,
+            walletAddress: data.user.walletAddress,
+            isPremium: data.user.isPremium,
+            isAdmin: data.user.isAdmin,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to call register-wallet API:", error);
+      setCurrentUser(null); // Clear user data on API error
+    }
   };
 
+  const disconnect = () => {
+    setIsConnected(false)
+    setAccount(null)
+    setCurrentUser(null); // Clear currentUser on disconnect
+  }
+
   return (
-    <WalletContext.Provider value={value}>{children}</WalletContext.Provider>
-  );
+    <WalletContext.Provider value={{ isConnected, connect, disconnect, account, currentUser }}>{children}</WalletContext.Provider>
+  )
 }
 
 export function useWallet() {
-  const context = useContext(WalletContext);
+  const context = useContext(WalletContext)
   if (context === undefined) {
-    throw new Error("useWallet must be used within a WalletProvider");
+    throw new Error("useWallet must be used within a WalletProvider")
   }
-  return context;
+  console.log("useWallet:", useWallet)
+  return context
 }

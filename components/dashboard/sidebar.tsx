@@ -34,13 +34,13 @@ const categories = [
       { label: "Genius (TM)", icon: "MessageSquare", href: "/dashboard/chat" },
     ],
   },
+  // Removed Personal category
 ]
 
 export function DashboardSidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-  const { status } = useWallet();
-  const isConnected = status === 'authenticated';
+  const { isConnected } = useWallet();
   // Get chat context
   const { 
     conversations, 

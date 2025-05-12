@@ -6,64 +6,55 @@ import { usePathname } from "next/navigation"; // useRouter not used, removed
 import { useEffect, useState } from "react";
 
 export function useDashboardAccess() {
-  const { status, isPremium: isUserPremium, account } = useWallet(); // Get status and isPremium from context
-  const [isOpen, setIsOpen] = useState(false); // For controlling the premium modal
+  const { isConnected, account, currentUser } = useWallet(); // Get currentUser from context
+  // const [premium, setPremium] = useState(false); // premium status now comes from currentUser
+  const [isOpen, setIsOpen] = useState(false); // For controlling a modal, presumably
   const pathname = usePathname();
 
-  const isConnected = status === 'authenticated'; // Determine connection status
+  const isUserPremium = !!currentUser?.isPremium; // Get premium status from currentUser
 
   useEffect(() => {
-    if (status === 'loading') {
-      // If session is loading, don't do anything yet, modal should remain closed or managed by its previous state.
-      // Or explicitly ensure it's closed if it shouldn't show during loading:
-      // setIsOpen(false); 
-      return;
-    }
-
-    if (isConnected) { // User is authenticated
+    // No need to fetch premium status separately, it's in currentUser
+    if (isConnected && account) { // Ensure account is also present, though currentUser implies it
       if (restrictedRoutes.includes(pathname) && !isUserPremium) {
         setIsOpen(true); // Open modal if on restricted route and not premium
-      } else {
-        // If on non-restricted route, or if user is premium on a restricted route,
-        // ensure modal is closed.
-        setIsOpen(false);
+      } else if (!restrictedRoutes.includes(pathname) || isUserPremium) {
+        // If on non-restricted route, or if user is premium, ensure modal is closed
+        // This might be too aggressive if modal is used for other things.
+        // Consider if modal should only be set to true here and closed by its own logic.
+        // For now, let's assume it's only for premium restriction.
+        // setIsOpen(false); // Let's comment this out to prevent unintended closing. Modal should manage its own close.
       }
-    } else {
-      // User is not authenticated, ensure modal is closed as middleware should handle redirection.
-      // Or, if a login prompt is desired here for UX, this could be a place.
-      // For now, assuming middleware handles unauthenticated access to dashboard.
-      setIsOpen(false);
     }
-  }, [status, isConnected, account, pathname, isUserPremium]); // Dependencies for the effect
+  }, [isConnected, account, pathname, isUserPremium]); // Add isUserPremium to dependencies
 
   const restrictedRoutes = [
     "/dashboard/allocations",
     "/dashboard/chat",
     "/dashboard/generate-strategy",
     "/dashboard/performance",
-    // "/dashboard/portfolio-chat", // Assuming this might be covered by /dashboard/chat or is a separate feature
+    "/dashboard/portfolio-chat",
     "/dashboard/settings",
-    // "/dashboard/strategies", // Assuming this was a typo or old route
+    // "/dashboard/strategies", // Assuming this was a typo or old route, common pattern is plural
   ];
 
-  const isCurrentRouteRestricted = restrictedRoutes.includes(pathname);
+  const isRestricted = restrictedRoutes.includes(pathname);
 
   const onOpenChange = (open: boolean) => {
-    // If trying to close the modal on a restricted page without being premium and authenticated, keep it open.
-    if (isCurrentRouteRestricted && !isUserPremium && isConnected && !open) {
+    // If trying to close the modal on a restricted page without premium, keep it open.
+    if (isRestricted && !isUserPremium && isConnected && !open) {
       setIsOpen(true); 
     } else {
       setIsOpen(open);
     }
   };
 
-  // Return the necessary values for the dashboard layout
   return {
+    isConnected,
+    isPremium: isUserPremium, // Use premium status from context
     isOpen,
     onOpenChange,
-    // Optionally, expose isConnected and isUserPremium if needed directly by the layout,
-    // though the modal's visibility (isOpen) is the primary concern here.
-    // isConnected, 
-    // isPremium: isUserPremium 
+    // Expose currentUser if other parts of the dashboard need more details
+    // currentUser 
   };
 }

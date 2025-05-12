@@ -56,30 +56,23 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Standard check for other users or if hardcoded admin was fetched/updated
-        if (user) { // If user exists (admin or regular)
+        if (user && user.isAdmin) {
           return { 
             id: user.id, 
             walletAddress: user.walletAddress,
             email: user.email, 
             name: user.name,   
-            isAdmin: user.isAdmin, // Pass the actual isAdmin status
-            isPremium: user.isPremium, // Pass the actual isPremium status
+            isAdmin: true, // Ensure this is true for the hardcoded admin
+            isPremium: user.isPremium,
           };
         } else {
-          // If user does not exist in DB and is not the hardcoded admin,
-          // we might want to create a basic user record here or rely on a separate registration flow.
-          // For now, if not found and not hardcoded admin, deny.
-          // Consider if a new non-admin, non-premium user should be created on first wallet connect.
-          // The current `registerUserWallet` API seems to handle user creation.
-          // This authorize function is primarily for *signing in* an existing or recognized user.
-          return null; 
+          return null; // User not found or not an admin (and not the hardcoded one)
         }
       },
     }),
   ],
   session: {
     strategy: 'jwt', // Using JWT for sessions
-    maxAge: 604800, // 7 days in seconds
   },
   callbacks: {
     async jwt({ token, user }) {

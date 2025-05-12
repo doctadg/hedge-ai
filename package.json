@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run db:setup && next build",
+    "build": "npx prisma db push && npx pisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "db:setup": "npx prisma db push"
+    "db:setup": "node -r dotenv/config db/setup.mjs"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
