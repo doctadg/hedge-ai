@@ -144,25 +144,31 @@ export function DashboardSidebar() {
               {/* Removed explicit height, use flex-1 on parent */}
               <ScrollArea className="flex-1"> 
                 <div className="space-y-1 pr-2"> {/* Add padding-right for scrollbar */}
-                  {isLoadingConversations && <p className="px-2 text-xs text-gray-500">Loading...</p>}
-                  {errorConversations && <p className="px-2 text-xs text-red-500">Error loading chats</p>}
-                  {!isLoadingConversations && conversations.map((conv) => (
-                    <Button
-                      key={conv.id}
-                      variant="ghost"
-                      onClick={() => {
-                        selectConversation(conv.id);
-                        if (isOpen) setIsOpen(false); // Close mobile sidebar
-                      }}
-                      className={`w-full justify-start text-left truncate h-8 px-2 py-1 ${ // Adjusted height/padding
-                        currentConversationId === conv.id
-                          ? "bg-[#1a1a1a] text-white"
-                          : "text-gray-400 hover:bg-[#1a1a1a] hover:text-white"
-                      }`}
-                    >
-                      <span className="flex-1 truncate text-sm">{conv.title}</span> {/* Ensure text size */}
-                    </Button>
-                  ))}
+                  {isLoadingConversations ? (
+                    <p className="px-2 text-xs text-gray-500">Loading...</p>
+                  ) : errorConversations ? (
+                    <p className="px-2 text-xs text-red-500">Error loading chats: {errorConversations}</p>
+                  ) : conversations.length > 0 ? (
+                    conversations.map((conv) => (
+                      <Button
+                        key={conv.id}
+                        variant="ghost"
+                        onClick={() => {
+                          selectConversation(conv.id);
+                          if (isOpen) setIsOpen(false); // Close mobile sidebar
+                        }}
+                        className={`w-full justify-start text-left truncate h-8 px-2 py-1 ${
+                          currentConversationId === conv.id
+                            ? "bg-[#1a1a1a] text-white"
+                            : "text-gray-400 hover:bg-[#1a1a1a] hover:text-white"
+                        }`}
+                      >
+                        <span className="flex-1 truncate text-sm">{conv.title}</span>
+                      </Button>
+                    ))
+                  ) : (
+                    <p className="px-2 text-xs text-gray-500">No conversations yet.</p>
+                  )}
                 </div>
               </ScrollArea>
             </div>
