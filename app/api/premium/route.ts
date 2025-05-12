@@ -1,38 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma'; // Import Prisma client
+import prisma from '@/lib/prisma';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest) { // Kept as POST to minimize client changes, though GET might be more appropriate
   try {
-    const { walletAddress } = await req.json();
+    const session = await getServerSession(authOptions);
 
-    if (!walletAddress) {
-      return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 });
+    if (!session || !session.user) {
+      console.log('[API premium] Unauthorized: No active session.');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    console.log(`[API premium] Checking premium status for wallet: ${walletAddress}`); // Added logging
 
-    // Use Prisma to find the user by wallet address
-    const user = await prisma.user.findUnique({
-      where: {
-        walletAddress: walletAddress, // Use the field name from the Prisma schema
-      },
-      select: {
-        isPremium: true, // Select only the isPremium field
-      },
-    });
-    console.log(`[API premium] User found:`, user); // Added logging
+    // The premium status is directly available in the session token
+    const isUserPremium = session.user.isPremium as boolean;
+    const userId = session.user.id;
 
-    if (user) {
-      console.log(`[API premium] Returning isPremium: ${user.isPremium}`); // Added logging
-      return NextResponse.json({ isPremium: user.isPremium });
-    } else {
-      console.log(`[API premium] User not found, returning isPremium: false`); // Added logging
-      // User not found, default to false
-      return NextResponse.json({ isPremium: false });
-    }
+    console.log(`[API premium] Checked premium status for user ${userId} via session: ${isUserPremium}`);
+    
+    // This endpoint now just returns the premium status from the session.
+    // The database is the source of truth that populates the session token,
+    // so this is consistent.
+    return NextResponse.json({ isPremium: isUserPremium });
 
   } catch (error) {
-    console.error('Error checking premium status:', error);
-    // Consider more specific error handling based on Prisma errors if needed
+    console.error('[API premium] Error checking premium status via session:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

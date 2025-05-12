@@ -23,12 +23,12 @@ export default function DashboardLayout({
   return (
     <div className="flex flex-col min-h-screen bg-black">
       <DashboardTopBar />
-      {/* Removed className from Dialog */}
-      <Dialog open={isOpenModal} onOpenChange={onOpenModalChange}> 
-        {/* Added className to DialogContent */}
-        <DialogContent className="sm:max-w-[425px] data-[state=open]:bg-black/95"> 
-          <DialogHeader>
-            <DialogTitle>Premium Access Required</DialogTitle>
+      {/* Conditionally render Dialog after client has mounted to avoid hydration issues with isOpenModal */}
+      {hasMounted && (
+        <Dialog open={isOpenModal} onOpenChange={onOpenModalChange}> 
+          <DialogContent className="sm:max-w-[425px] data-[state=open]:bg-black/95"> 
+            <DialogHeader>
+              <DialogTitle>Premium Access Required</DialogTitle>
             <DialogDescription>
               This feature is available to premium users only. Please participate in the presale to unlock this feature.
             </DialogDescription>
@@ -39,6 +39,7 @@ export default function DashboardLayout({
           </div>
         </DialogContent>
       </Dialog>
+      )}
       {/* Wrap the sidebar and main content with ChatProvider */}
       <ChatProvider>
         <div className="flex flex-1 overflow-hidden"> {/* Added overflow-hidden here */}
