@@ -29,13 +29,20 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [errorConversations, setErrorConversations] = useState<string | null>(null);
   const { data: session, status: sessionStatus } = useSession(); // Use NextAuth session
+  const [hasMounted, setHasMounted] = useState(false);
   // const { account, currentUser } = useWallet(); // account and currentUser.isPremium will come from session
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const fetchConversations = useCallback(async () => {
     // Only fetch if authenticated and user is premium (from NextAuth session)
+    // This check is also present in the useEffect, but good for direct calls too.
     if (sessionStatus !== 'authenticated' || !session?.user?.isPremium) {
       console.log('[ChatContext] User not authenticated or not premium, skipping conversation fetch.');
       setConversations([]);
+      // setCurrentConversationId(null); // Let the main effect handle clearing currentConversationId
       setIsLoadingConversations(false);
       return;
     }
@@ -68,15 +75,17 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Fetch conversations when session status or user's premium status changes
   useEffect(() => {
+    if (!hasMounted) return; // Don't run on server or before client mount
+
     if (sessionStatus === 'authenticated' && session?.user?.isPremium) {
       console.log('[ChatContext] User authenticated and premium, triggering conversation fetch.');
       fetchConversations();
     } else {
       console.log('[ChatContext] User not authenticated or not premium - clearing conversations.');
       setConversations([]);
-      setCurrentConversationId(null);
+      setCurrentConversationId(null); // Clear current conversation if user logs out or loses premium
     }
-  }, [sessionStatus, session, fetchConversations]); // session.user.isPremium is covered by `session` dependency
+  }, [sessionStatus, session, fetchConversations, hasMounted]); // session.user.isPremium is covered by `session` dependency
 
   const selectConversation = (conversationId: string) => {
     console.log('[ChatContext] Selecting conversation:', conversationId);

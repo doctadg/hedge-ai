@@ -66,9 +66,9 @@ export function DashboardSidebar() {
       <aside
         className={`${
           isOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0 transition-transform duration-300 ease-in-out fixed inset-y-0 left-0 z-40 w-64 overflow-y-auto border-r border-[#1a1a1a] bg-[#0a0a0a] lg:static lg:block h-full`} // Added h-full
+        } lg:translate-x-0 transition-transform duration-300 ease-in-out fixed inset-y-0 left-0 z-40 w-64 border-r border-[#1a1a1a] bg-[#0a0a0a] lg:static lg:block h-full flex flex-col`} // Added flex flex-col, removed overflow-y-auto
       >
-        <div className="p-4">
+        <div className="p-4"> {/* This is the search bar, it will not grow */}
           <input
             type="search"
             placeholder="Search metrics"
