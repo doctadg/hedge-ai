@@ -25,21 +25,6 @@ export default withAuth(
       }
     }
 
-    // If trying to access dashboard routes
-    if (pathname.startsWith('/dashboard')) {
-      if (!token) {
-        // If not authenticated, redirect to a general login/home page.
-        // The ConnectButton on the homepage will handle the wallet connection and subsequent NextAuth sign-in flow.
-        const homeUrl = new URL('/', req.url);
-        // Optionally, you could add a query param to indicate why they were redirected
-        // homeUrl.searchParams.set('reason', 'unauthenticated_dashboard_access');
-        return NextResponse.redirect(homeUrl);
-      }
-      // Further checks, like premium status for specific dashboard sub-pages,
-      // can be handled by the useDashboardAccess hook on the client-side,
-      // or by adding more specific logic here if needed for server-side enforcement.
-    }
-
     // If trying to access hedge-chat API routes
     if (pathname.startsWith('/api/hedge-chat')) {
       if (!token) {
@@ -56,7 +41,7 @@ export default withAuth(
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl;
         // Define all protected path prefixes
-        const protectedPaths = ['/admin', '/api/admin', '/dashboard', '/api/hedge-chat'];
+        const protectedPaths = ['/admin', '/api/admin', '/api/hedge-chat'];
         
         // If accessing any protected path, a token must exist.
         if (protectedPaths.some(path => pathname.startsWith(path))) {
@@ -80,7 +65,8 @@ export const config = {
   matcher: [
     '/admin/:path*',           // Protect all routes under /admin
     '/api/admin/:path*',       // Protect all API routes under /api/admin
-    '/dashboard/:path*',       // Protect all routes under /dashboard
+    // Dashboard routes are now publicly accessible by the middleware;
+    // client-side logic will handle auth and premium checks.
     '/api/hedge-chat/:path*',  // Protect all API routes under /api/hedge-chat
   ],
 };
