@@ -190,7 +190,7 @@ const Bubble = ({ coin, index, totalBubbles }: BubbleProps) => {
         }
       });
     }
-  }, [isInView, y, innerControls, outerControls, floatDelay]); // Restored outerControls
+  }, [isInView, y, innerControls, outerControls, floatDelay]);
 
   const handleHoverStart = () => {
     innerControls.start({ scale: 1.15, transition: { type: 'spring', stiffness: 300, damping: 20 } });
@@ -203,7 +203,7 @@ const Bubble = ({ coin, index, totalBubbles }: BubbleProps) => {
   return (
     <motion.div
       ref={ref}
-      className="absolute group cursor-pointer"
+      className="absolute group cursor-pointer" // z-index on group hover will be handled by whileHover
       initial="hidden"
       animate={outerControls} 
       variants={{
@@ -222,11 +222,11 @@ const Bubble = ({ coin, index, totalBubbles }: BubbleProps) => {
       style={{ x: x }} 
       onHoverStart={handleHoverStart}
       onHoverEnd={handleHoverEnd}
-      whileHover={{ zIndex: 50 }} 
+      whileHover={{ zIndex: 50 }} // This zIndex applies to the motion.div itself
     >
       <motion.div
         animate={innerControls} 
-        className={`relative rounded-full shadow-2xl border border-white/10 flex items-center justify-center overflow-hidden backdrop-blur-md`}
+        className={`relative rounded-full shadow-2xl border border-white/10 flex items-center justify-center backdrop-blur-md`}
         style={{ 
           width: `${dynamicSize}px`, 
           height: `${dynamicSize}px`,
@@ -257,7 +257,8 @@ const Bubble = ({ coin, index, totalBubbles }: BubbleProps) => {
           }}
         ></div>
       </motion.div>
-      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-3 py-1.5 bg-gray-900/80 backdrop-blur-sm text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none">
+      {/* Tooltip with high z-index */}
+      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-3 py-1.5 bg-gray-900/80 backdrop-blur-sm text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-[60] pointer-events-none"> {/* Increased z-index for tooltip */}
         <div className="font-bold mb-0.5">{coin.name}</div>
         <div>Price: {formatCurrency(coin.current_price, false)}</div>
         <div>Mkt Cap: {formatCurrency(coin.market_cap)}</div>
@@ -278,7 +279,8 @@ const MarketPulse = ({ marketData }: { marketData: MarketData[] }) => {
   }
 
   return (
-    <div className="relative min-h-[450px] flex justify-center items-center p-4 my-12 overflow-hidden">
+    // Added z-index to this container to help with tooltip visibility
+    <div className="relative min-h-[450px] flex justify-center items-center p-4 my-12 z-20"> 
       <div className="absolute inset-0 bg-gradient-radial from-emerald-900/10 via-transparent to-transparent rounded-full blur-[80px] opacity-40"></div>
       <div className="relative w-full h-full flex justify-center items-center scale-90 md:scale-100">
         {marketData.map((coin, index) => (
@@ -360,13 +362,13 @@ export function DataSection() {
   
   const sectionRef = useRef(null);
   const dataSectionControls = useAnimation(); 
-  const sectionIsInView = useInView(sectionRef, { once: false, amount: 0.2 }); // Use a different name for this isInView
+  const sectionIsInView = useInView(sectionRef, { once: false, amount: 0.2 }); 
   
   useEffect(() => {
-    if (sectionIsInView) { // Use the correctly named isInView boolean
+    if (sectionIsInView) { 
       dataSectionControls.start("visible"); 
     }
-  }, [dataSectionControls, sectionIsInView]); // Use the boolean in dependency array
+  }, [dataSectionControls, sectionIsInView]); 
 
   useEffect(() => {
     async function loadData() {
@@ -516,9 +518,9 @@ export function DataSection() {
   ];
 
   return (
-    <section ref={sectionRef} className="bg-black py-24 px-4 min-h-screen flex flex-col justify-center relative overflow-hidden">
+    <section ref={sectionRef} className="bg-black py-24 px-4 min-h-screen flex flex-col justify-center relative overflow-hidden"> {/* Ensure this section itself doesn't clip if it's the root cause */}
       <AnimatedBackground />
-      <div className="container mx-auto relative z-10">
+      <div className="container mx-auto relative z-10"> {/* This container might need a z-index if tabs are outside it but visually overlapping */}
         <motion.div
           className="text-center mb-16"
           initial={{ opacity: 0, y: -20 }}
@@ -533,7 +535,8 @@ export function DataSection() {
            </p>
          </motion.div>
 
-        <div className="flex justify-center mb-12">
+        {/* Tab Navigation - This is likely above MarketPulse in DOM order or has its own z-index */}
+        <div className="flex justify-center mb-12 relative z-30"> {/* Added z-30 to tabs to ensure they are above MarketPulse's z-20 if they are siblings */}
           <div className="inline-flex rounded-md p-1 bg-black/30 backdrop-blur-sm border border-gray-800/50">
             <button
               className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
@@ -558,7 +561,7 @@ export function DataSection() {
           </div>
         </div>
 
-        <div className="mb-12">
+        <div className="mb-12"> {/* This div contains MarketPulse */}
           <AnimatePresence mode="wait">
             {activeTab === 'market' ? (
               <motion.div
