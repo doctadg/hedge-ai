@@ -105,7 +105,7 @@ export const authOptions: NextAuthOptions = {
     // error: '/auth/error', // Custom error page (optional)
   },
   secret: process.env.NEXTAUTH_SECRET, // IMPORTANT: Set this in .env.local
-  debug: process.env.NODE_ENV === 'development', // Enable debug logs in development
+  debug: true, // Temporarily force debug logs for troubleshooting
   // Explicitly configure cookies for development compatibility
   cookies: {
     sessionToken: {
@@ -114,7 +114,7 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: true, // Explicitly set secure for HTTPS environments like Vercel
+        secure: process.env.NODE_ENV === 'production', // Secure cookies in production
         // domain: // Optional: specify domain if needed, e.g., for subdomains
       },
     },

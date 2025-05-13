@@ -62,7 +62,7 @@ const MetricCard = ({
       ref={ref}
       className={`relative overflow-hidden rounded-xl backdrop-blur-md p-6 ${
         highlight 
-          ? 'bg-gradient-to-br from-emerald-900/80 to-green-900/80 border border-emerald-500/30' // Changed indigo/purple to emerald/green
+          ? 'bg-gradient-to-br from-emerald-900/80 to-green-900/80 border border-emerald-500/30'
           : 'bg-black/40 border border-gray-800/50'
       } shadow-xl`}
       initial="hidden"
@@ -80,9 +80,8 @@ const MetricCard = ({
         }
       }}
     >
-      {/* Glow effect for highlighted cards */}
       {highlight && (
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-green-500/10 opacity-30"></div> // Changed indigo/purple to emerald/green
+        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-green-500/10 opacity-30"></div>
       )}
       
       <div className="flex justify-between items-start">
@@ -94,144 +93,207 @@ const MetricCard = ({
         {change && (
           <span className={`text-sm font-medium mt-1 ${
             isPositive ? 'text-emerald-400' : isNegative ? 'text-rose-400' : 'text-gray-400'
-          }`}>
+          }`} >
             {change}
           </span>
         )}
       </div>
       
-      {/* Subtle animated gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-shimmer"></div>
     </motion.div>
   );
 };
 
-// Enhanced Market Pulse Component
-const MarketPulse = ({ 
-  ethChangePercent, 
-  btcChangePercent 
-}: { 
-  ethChangePercent: number | undefined;
-  btcChangePercent: number | undefined;
-}) => {
-  const ethControls = useAnimation();
-  const btcControls = useAnimation();
-  
-  useEffect(() => {
-    // Animate based on market movement
-    const ethAnimation = {
-      scale: [1, ethChangePercent && ethChangePercent > 0 ? 1.05 : 0.95, 1],
-      opacity: [0.8, 1, 0.8],
-    };
-    
-    const btcAnimation = {
-      scale: [1, btcChangePercent && btcChangePercent > 0 ? 1.05 : 0.95, 1],
-      opacity: [0.8, 1, 0.8],
-    };
-    
-    ethControls.start({
-      ...ethAnimation,
-      transition: { 
-        repeat: Infinity, 
-        duration: 4,
-        ease: "easeInOut"
-      }
-    });
-    
-    btcControls.start({
-      ...btcAnimation,
-      transition: { 
-        repeat: Infinity, 
-        duration: 4,
-        ease: "easeInOut",
-        delay: 1 // Offset animation
-      }
-    });
-  }, [ethChangePercent, btcChangePercent, ethControls, btcControls]);
+// Define a type for the market data
+interface MarketData {
+  id: string;
+  symbol: string;
+  name: string;
+  image: string;
+  current_price: number;
+  market_cap: number;
+  market_cap_rank: number;
+  price_change_percentage_24h: number;
+  market_cap_change_percentage_24h: number;
+  circulating_supply: number;
+  total_supply: number;
+  max_supply: number | null;
+  ath: number;
+  ath_change_percentage: number;
+  ath_date: string;
+  atl: number;
+  atl_change_percentage: number;
+  atl_date: string;
+  roi: any; 
+  last_updated: string;
+  high_24h?: number; 
+  low_24h?: number;  
+}
 
-  const getEthColor = () => {
-    if (ethChangePercent === undefined) return 'from-gray-600 to-gray-800';
-    return ethChangePercent >= 0 
-      ? 'from-emerald-500 to-emerald-700' 
-      : 'from-rose-500 to-rose-700';
-  };
+// --- Bubble Component ---
+interface BubbleProps {
+  coin: MarketData;
+  index: number;
+  totalBubbles: number;
+}
+
+const Bubble = ({ coin, index, totalBubbles }: BubbleProps) => {
+  const outerControls = useAnimation(); 
+  const innerControls = useAnimation(); 
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, amount: 0.5 });
+
+  const changePercent = coin.price_change_percentage_24h ?? 0;
+  const isPositive = changePercent >= 0;
+
+  const baseSize = 70; 
+  const maxSizeScaleFactor = 1.7; 
+  const minSizeScaleFactor = 0.7; 
+  const changeMagnitude = Math.abs(changePercent);
+  const scaleFactor = Math.min(1 + (changeMagnitude / 10), maxSizeScaleFactor); 
   
-  const getBtcColor = () => {
-    if (btcChangePercent === undefined) return 'from-gray-600 to-gray-800';
-    return btcChangePercent >= 0 
-      ? 'from-amber-500 to-amber-700' 
-      : 'from-rose-500 to-rose-700';
+  let dynamicSize = baseSize * scaleFactor;
+  dynamicSize = Math.max(dynamicSize, baseSize * minSizeScaleFactor); 
+
+  const positiveColor = 'from-emerald-500/70 to-green-600/70';
+  const negativeColor = 'from-rose-500/70 to-red-600/70';
+  const neutralColor = 'from-gray-500/70 to-gray-700/70';
+  
+  const getColor = () => {
+    if (changePercent > 0.1) return positiveColor;
+    if (changePercent < -0.1) return negativeColor;
+    return neutralColor;
+  };
+
+  const angle = (index / totalBubbles) * 2 * Math.PI + (Math.random() - 0.5) * 0.1; 
+  const radius = 160; 
+  const x = radius * Math.cos(angle);
+  const y = radius * Math.sin(angle);
+  
+  const floatDelay = Math.random() * 2; 
+
+  useEffect(() => {
+    if (isInView) {
+      outerControls.start("visible");
+      innerControls.start({
+        y: [0, -6, 0],
+        scale: 1, 
+        transition: {
+          y: {
+            duration: 3.5 + Math.random() * 2,
+            repeat: Infinity,
+            repeatType: "reverse",
+            ease: "easeInOut",
+            delay: floatDelay + 0.5 
+          },
+          scale: { duration: 0.2 } 
+        }
+      });
+    }
+  }, [isInView, y, innerControls, outerControls, floatDelay]); // Restored outerControls
+
+  const handleHoverStart = () => {
+    innerControls.start({ scale: 1.15, transition: { type: 'spring', stiffness: 300, damping: 20 } });
+  };
+
+  const handleHoverEnd = () => {
+    innerControls.start({ scale: 1, transition: { type: 'spring', stiffness: 300, damping: 20 } });
   };
 
   return (
-    <div className="relative h-64 flex justify-center items-center">
-      {/* Background glow */}
-      <div className="absolute inset-0 bg-gradient-radial from-emerald-900/20 to-transparent rounded-full blur-3xl"></div> // Changed indigo to emerald
-      
-      {/* Ethereum Pulse */}
+    <motion.div
+      ref={ref}
+      className="absolute group cursor-pointer"
+      initial="hidden"
+      animate={outerControls} 
+      variants={{
+        hidden: { opacity: 0, scale: 0.5, y: y + 20 }, 
+        visible: { 
+          opacity: 1,
+          scale: 1, 
+          y: y, 
+          transition: {
+            opacity: { duration: 0.5, delay: index * 0.08 },
+            scale: { type: 'spring', stiffness: 100, damping: 15, delay: index * 0.08 },
+            y: { type: 'spring', stiffness: 100, damping: 15, delay: index * 0.08 }
+          }
+        }
+      }}
+      style={{ x: x }} 
+      onHoverStart={handleHoverStart}
+      onHoverEnd={handleHoverEnd}
+      whileHover={{ zIndex: 50 }} 
+    >
       <motion.div
-        className={`absolute w-40 h-40 rounded-full bg-gradient-to-br ${getEthColor()} shadow-lg shadow-emerald-900/30 border border-white/10 flex items-center justify-center z-20`} // Changed shadow-indigo to shadow-emerald
-        animate={ethControls}
-        initial={{ scale: 0, opacity: 0 }}
-        whileInView={{ scale: 1, opacity: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 1, type: 'spring', stiffness: 100 }}
+        animate={innerControls} 
+        className={`relative rounded-full shadow-2xl border border-white/10 flex items-center justify-center overflow-hidden backdrop-blur-md`}
+        style={{ 
+          width: `${dynamicSize}px`, 
+          height: `${dynamicSize}px`,
+          background: `
+            radial-gradient(circle at 25% 20%, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.3) 25%, transparent 55%), 
+            radial-gradient(circle at 70% 85%, rgba(0,0,0,0.25) 0%, transparent 60%), 
+            linear-gradient(to bottom right, ${getColor().split(' ')[0]} 0%, ${getColor().split(' ')[1]} 100%)
+          ` 
+        }}
       >
-        <div className="text-center">
-          <div className="text-white font-bold text-lg">ETH</div>
-          {ethChangePercent !== undefined && (
-            <div className="font-bold text-xl text-white">
-              {formatPercentage(ethChangePercent)}
-            </div>
-          )}
-        </div>
-        
-        {/* Inner glow */}
-        <div className="absolute inset-0 rounded-full bg-gradient-radial from-white/20 to-transparent opacity-70"></div>
+        <div className="text-center text-white p-1 relative z-10 flex flex-col items-center justify-center">
+           <img 
+             src={coin.image} 
+             alt={coin.name} 
+             className="w-1/3 h-1/3 max-w-[32px] max-h-[32px] mb-1 opacity-95 filter drop-shadow-md"
+           />
+           <div className="font-bold text-[11px] leading-tight uppercase tracking-wider" style={{textShadow: '0px 1px 2px rgba(0,0,0,0.5)'}}>
+             {coin.symbol}
+           </div>
+           <div className={`font-semibold text-[12px] leading-tight ${isPositive ? 'text-emerald-200' : 'text-rose-200'}`} style={{textShadow: '0px 1px 2px rgba(0,0,0,0.5)'}}>
+             {formatPercentage(changePercent)}
+           </div>
+         </div>
+        <div 
+          className="absolute inset-0 rounded-full opacity-25 mix-blend-lighten"
+          style={{
+            background: `radial-gradient(circle at 60% 40%, rgba(255,255,255,0.5), transparent 70%)`
+          }}
+        ></div>
       </motion.div>
-      
-      {/* Bitcoin Pulse (smaller, positioned to the side) */}
-      <motion.div
-        className={`absolute w-28 h-28 rounded-full bg-gradient-to-br ${getBtcColor()} shadow-lg shadow-amber-900/30 border border-white/10 flex items-center justify-center z-10 -ml-32 -mt-16`} // Kept amber for BTC
-        animate={btcControls}
-        initial={{ scale: 0, opacity: 0 }}
-        whileInView={{ scale: 1, opacity: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 1, delay: 0.3, type: 'spring', stiffness: 100 }}
-      >
-        <div className="text-center">
-          <div className="text-white font-bold text-sm">BTC</div>
-          {btcChangePercent !== undefined && (
-            <div className="font-bold text-base text-white">
-              {formatPercentage(btcChangePercent)}
-            </div>
-          )}
-        </div>
-        
-        {/* Inner glow */}
-        <div className="absolute inset-0 rounded-full bg-gradient-radial from-white/20 to-transparent opacity-70"></div>
-      </motion.div>
-      
-      {/* Connection lines */}
-      <svg className="absolute inset-0 w-full h-full z-0" viewBox="0 0 400 400">
-        <defs>
-          <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(16, 185, 129, 0.3)" /> {/* Changed indigo to emerald */}
-            <stop offset="100%" stopColor="rgba(5, 150, 105, 0.3)" /> {/* Changed purple to green */}
-          </linearGradient>
-        </defs>
-        <path 
-          d="M200,200 L120,140" 
-          stroke="url(#lineGradient)" 
-          strokeWidth="1.5" 
-          fill="none"
-          strokeDasharray="5,5"
-          className="animate-pulse"
-        />
-      </svg>
+      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-3 py-1.5 bg-gray-900/80 backdrop-blur-sm text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none">
+        <div className="font-bold mb-0.5">{coin.name}</div>
+        <div>Price: {formatCurrency(coin.current_price, false)}</div>
+        <div>Mkt Cap: {formatCurrency(coin.market_cap)}</div>
+        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-gray-900/80"></div>
+      </div>
+    </motion.div>
+  );
+};
+
+// Enhanced Market Pulse Component
+const MarketPulse = ({ marketData }: { marketData: MarketData[] }) => {
+  if (!marketData || marketData.length === 0) {
+    return (
+      <div className="relative h-96 flex justify-center items-center text-gray-500">
+        No market data available for pulse visualization.
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative min-h-[450px] flex justify-center items-center p-4 my-12 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-radial from-emerald-900/10 via-transparent to-transparent rounded-full blur-[80px] opacity-40"></div>
+      <div className="relative w-full h-full flex justify-center items-center scale-90 md:scale-100">
+        {marketData.map((coin, index) => (
+          <Bubble 
+            key={coin.id} 
+            coin={coin} 
+            index={index} 
+            totalBubbles={marketData.length} 
+          />
+        ))}
+      </div>
     </div>
   );
 };
+
 
 // Enhanced Data Stream Component
 const DataStream = ({ streamData }: { streamData: Array<{ label: string; value: string | undefined }> }) => {
@@ -239,7 +301,6 @@ const DataStream = ({ streamData }: { streamData: Array<{ label: string; value: 
   
   if (validData.length === 0) return null;
   
-  // Calculate animation duration based on content length
   const estimatedCharWidth = 8;
   const separatorWidth = 40;
   const totalContentWidth = validData.reduce((acc, item) => {
@@ -251,7 +312,7 @@ const DataStream = ({ streamData }: { streamData: Array<{ label: string; value: 
   const scrollDuration = Math.max(25, totalContentWidth / 35);
 
   return (
-    <div className="w-full overflow-hidden relative h-14 bg-gradient-to-r from-black/60 via-emerald-950/30 to-black/60 backdrop-blur-md border-t border-b border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]"> {/* Changed indigo to emerald */}
+    <div className="w-full overflow-hidden relative h-14 bg-gradient-to-r from-black/60 via-emerald-950/30 to-black/60 backdrop-blur-md border-t border-b border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
       <motion.div
         className="absolute top-0 left-0 whitespace-nowrap flex items-center h-full"
         animate={{ x: ['0%', `-${100 * validData.length / (validData.length || 1)}%`] }}
@@ -264,16 +325,13 @@ const DataStream = ({ streamData }: { streamData: Array<{ label: string; value: 
           },
         }}
       >
-        {/* Render items twice for seamless loop */}
         {[...validData, ...validData].map((item, index) => (
           <div key={index} className="mx-5 flex items-center h-full group">
-            <span className="text-emerald-300/80 mr-2 text-sm font-medium">{item.label}:</span> {/* Changed indigo to emerald */}
-            <span className="text-white font-semibold text-sm tracking-wide group-hover:text-emerald-300 transition-colors">{item.value}</span> {/* Changed indigo to emerald */}
+            <span className="text-emerald-300/80 mr-2 text-sm font-medium">{item.label}:</span>
+            <span className="text-white font-semibold text-sm tracking-wide group-hover:text-emerald-300 transition-colors">{item.value}</span>
           </div>
         ))}
       </motion.div>
-      
-      {/* Gradient overlays for fade effect */}
       <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-black to-transparent z-10"></div>
       <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-black to-transparent z-10"></div>
     </div>
@@ -284,12 +342,9 @@ const DataStream = ({ streamData }: { streamData: Array<{ label: string; value: 
 const AnimatedBackground = () => {
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {/* Grid lines */}
       <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center opacity-[0.02]"></div>
-      
-      {/* Gradient orbs */}
-      <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-600 rounded-full filter blur-[100px] opacity-10"></div> {/* Changed indigo to emerald */}
-      <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-green-600 rounded-full filter blur-[100px] opacity-10"></div> {/* Changed purple to green */}
+      <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-600 rounded-full filter blur-[100px] opacity-10"></div>
+      <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-green-600 rounded-full filter blur-[100px] opacity-10"></div>
     </div>
   );
 };
@@ -298,65 +353,56 @@ const AnimatedBackground = () => {
 export function DataSection() {
   const [globalData, setGlobalData] = useState<any>(null);
   const [globalDefiData, setGlobalDefiData] = useState<any>(null);
-  const [ethMarketData, setEthMarketData] = useState<any>(null);
-  const [btcMarketData, setBtcMarketData] = useState<any>(null);
+  const [topMarketData, setTopMarketData] = useState<MarketData[]>([]); 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'market' | 'defi'>('market');
   
   const sectionRef = useRef(null);
-  const isInView = useInView(sectionRef, { once: false, amount: 0.2 });
-  const controls = useAnimation();
+  const dataSectionControls = useAnimation(); 
+  const sectionIsInView = useInView(sectionRef, { once: false, amount: 0.2 }); // Use a different name for this isInView
   
   useEffect(() => {
-    if (isInView) {
-      controls.start("visible");
+    if (sectionIsInView) { // Use the correctly named isInView boolean
+      dataSectionControls.start("visible"); 
     }
-  }, [controls, isInView]);
+  }, [dataSectionControls, sectionIsInView]); // Use the boolean in dependency array
 
   useEffect(() => {
     async function loadData() {
       setLoading(true);
       setError(null);
       try {
-        // Fetch all data concurrently
-        const [gData, gDefiData, ethMData, btcMData] = await Promise.all([
+        const [gData, gDefiData, topMarkets] = await Promise.all([
           fetchCoinGeckoGlobal(),
           fetchCoinGeckoGlobalDefi(),
-          fetchCoinGeckoMarkets({ ids: "ethereum", vs_currency: "usd" }),
-          fetchCoinGeckoMarkets({ ids: "bitcoin", vs_currency: "usd" }),
+          fetchCoinGeckoMarkets({ 
+            vs_currency: "usd", 
+            order: "market_cap_desc", 
+            per_page: 8, 
+            page: 1,
+            sparkline: false, 
+            price_change_percentage: '24h' 
+          }), 
         ]);
 
-        // Basic validation
         if (!gData || !gDefiData) {
           throw new Error("Missing global or DeFi data");
+        }
+        if (!topMarkets || topMarkets.length === 0) {
+          throw new Error("Failed to fetch top market data");
         }
 
         setGlobalData(gData);
         setGlobalDefiData(gDefiData);
-
-        if (ethMData && ethMData.length > 0) {
-          setEthMarketData(ethMData[0]);
-        } else {
-          console.warn("Ethereum market data not found.");
-          setEthMarketData(null);
-        }
-
-        if (btcMData && btcMData.length > 0) {
-          setBtcMarketData(btcMData[0]);
-        } else {
-          console.warn("Bitcoin market data not found.");
-          setBtcMarketData(null);
-        }
+        setTopMarketData(topMarkets as MarketData[]); 
 
       } catch (err: any) {
         console.error("Error fetching CoinGecko data for DataSection:", err);
         setError(`Failed to load market data: ${err.message || "Unknown error"}`);
-        // Clear potentially partial data
         setGlobalData(null);
         setGlobalDefiData(null);
-        setEthMarketData(null);
-        setBtcMarketData(null);
+        setTopMarketData([]); 
       } finally {
         setLoading(false);
       }
@@ -365,14 +411,13 @@ export function DataSection() {
     loadData();
   }, []);
 
-  // Loading State
   if (loading) {
     return (
       <section className="bg-black py-24 px-4 min-h-screen flex flex-col justify-center items-center relative overflow-hidden">
         <AnimatedBackground />
         <div className="container mx-auto relative z-10 text-center">
           <div className="text-white text-xl font-light">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-emerald-400 border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite] mr-3"></div> {/* Changed indigo to emerald */}
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-emerald-400 border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite] mr-3"></div>
             Loading Market Intelligence...
           </div>
         </div>
@@ -380,7 +425,6 @@ export function DataSection() {
     );
   }
 
-  // Error State
   if (error) {
     return (
       <section className="bg-black py-24 px-4 min-h-screen flex flex-col justify-center items-center relative overflow-hidden">
@@ -389,7 +433,7 @@ export function DataSection() {
           <h2 className="text-3xl font-bold text-red-500 mb-4">Error Loading Data</h2>
           <p className="text-gray-400">{error}</p>
           <button 
-            className="mt-6 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors" // Changed indigo to emerald
+            className="mt-6 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors"
             onClick={() => window.location.reload()}
           >
             Retry
@@ -399,22 +443,16 @@ export function DataSection() {
     );
   }
 
-  // Data Extraction (after loading and error checks)
   const cgGlobal = globalData?.data;
   const cgDefi = globalDefiData?.data;
-  const ethData = ethMarketData;
-  const btcData = btcMarketData;
+  
+  const ethData = topMarketData.find(coin => coin.id === 'ethereum');
+  const btcData = topMarketData.find(coin => coin.id === 'bitcoin');
 
-  // Calculate ETH/BTC Ratio safely
   const ethBtcRatio = (ethData?.current_price && btcData?.current_price)
     ? (ethData.current_price / btcData.current_price).toFixed(6)
     : 'N/A';
 
-  // Prepare Pulse Data
-  const ethChangePercent = ethData?.price_change_percentage_24h;
-  const btcChangePercent = btcData?.price_change_percentage_24h;
-
-  // Prepare Stream Data (Safely access properties)
   const streamData = [
     { label: "ETH Price", value: formatCurrency(ethData?.current_price, false) },
     { label: "ETH Mkt Cap", value: formatCurrency(ethData?.market_cap) },
@@ -431,7 +469,6 @@ export function DataSection() {
     { label: "Total Mkt Cap", value: formatCurrency(cgGlobal?.total_market_cap?.usd) },
   ].filter(item => item.value !== undefined && item.value !== 'N/A');
 
-  // Prepare Market Metrics
   const marketMetrics = [
     {
       title: "ETH Price",
@@ -452,13 +489,12 @@ export function DataSection() {
     {
       title: "ETH/BTC Ratio",
       value: ethBtcRatio,
-      change: ethData?.price_change_percentage_24h && btcData?.price_change_percentage_24h
+      change: (ethData?.price_change_percentage_24h !== undefined && btcData?.price_change_percentage_24h !== undefined)
         ? formatPercentage(ethData.price_change_percentage_24h - btcData.price_change_percentage_24h)
         : undefined
     }
   ];
 
-  // Prepare DeFi Metrics with proper typing
   const defiMetrics = [
     {
       title: "DeFi Market Cap",
@@ -481,11 +517,8 @@ export function DataSection() {
 
   return (
     <section ref={sectionRef} className="bg-black py-24 px-4 min-h-screen flex flex-col justify-center relative overflow-hidden">
-      {/* Animated Background */}
       <AnimatedBackground />
-
       <div className="container mx-auto relative z-10">
-        {/* Title and Description */}
         <motion.div
           className="text-center mb-16"
           initial={{ opacity: 0, y: -20 }}
@@ -500,13 +533,12 @@ export function DataSection() {
            </p>
          </motion.div>
 
-        {/* Tab Navigation */}
         <div className="flex justify-center mb-12">
           <div className="inline-flex rounded-md p-1 bg-black/30 backdrop-blur-sm border border-gray-800/50">
             <button
               className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
                 activeTab === 'market'
-                  ? 'bg-emerald-600 text-white shadow-lg' // Changed indigo to emerald
+                  ? 'bg-emerald-600 text-white shadow-lg' 
                   : 'text-gray-400 hover:text-white'
               }`}
               onClick={() => setActiveTab('market')}
@@ -516,7 +548,7 @@ export function DataSection() {
             <button
               className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
                 activeTab === 'defi'
-                  ? 'bg-emerald-600 text-white shadow-lg' // Changed indigo to emerald
+                  ? 'bg-emerald-600 text-white shadow-lg' 
                   : 'text-gray-400 hover:text-white'
               }`}
               onClick={() => setActiveTab('defi')}
@@ -526,7 +558,6 @@ export function DataSection() {
           </div>
         </div>
 
-        {/* Main Content Area */}
         <div className="mb-12">
           <AnimatePresence mode="wait">
             {activeTab === 'market' ? (
@@ -537,15 +568,12 @@ export function DataSection() {
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ duration: 0.5 }}
               >
-                {/* Market Pulse Visualization */}
-                {ethData && btcData && (
+                {topMarketData.length > 0 && (
                   <MarketPulse 
-                    ethChangePercent={ethChangePercent} 
-                    btcChangePercent={btcChangePercent} 
+                    marketData={topMarketData} 
                   />
                 )}
                 
-                {/* Market Metrics Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
                   {marketMetrics.map((metric, index) => (
                     <MetricCard
@@ -567,7 +595,6 @@ export function DataSection() {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.5 }}
               >
-                {/* DeFi Metrics Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
                   {defiMetrics.map((metric, index) => (
                     <MetricCard
@@ -584,7 +611,6 @@ export function DataSection() {
           </AnimatePresence>
         </div>
 
-        {/* Data Stream */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -593,7 +619,6 @@ export function DataSection() {
           <DataStream streamData={streamData} />
         </motion.div>
         
-        {/* Call to Action */}
         <motion.div 
           className="mt-16 text-center"
           initial={{ opacity: 0, y: 20 }}
@@ -602,7 +627,7 @@ export function DataSection() {
         >
           <a 
             href="#" 
-            className="inline-flex items-center px-8 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-medium rounded-lg shadow-lg hover:from-emerald-700 hover:to-green-700 transition-all" // Changed indigo/purple to emerald/green
+            className="inline-flex items-center px-8 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-medium rounded-lg shadow-lg hover:from-emerald-700 hover:to-green-700 transition-all"
           >
             Explore Advanced Analytics
           </a>

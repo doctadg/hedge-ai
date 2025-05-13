@@ -3,6 +3,7 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import Web3 from "web3"
+import { useSession } from "next-auth/react"; // Import useSession
 
 interface UserDetails {
   id: string;
@@ -25,40 +26,66 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [isConnected, setIsConnected] = useState(false)
   const [account, setAccount] = useState<string | null>(null)
   const [currentUser, setCurrentUser] = useState<UserDetails | null>(null); // Added currentUser state
+  const { data: session, status: sessionStatus } = useSession(); // Get NextAuth session
 
-  // Effect to check initial connection and potentially re-sync with NextAuth session
+  // Effect to sync WalletContext state with NextAuth session
   useEffect(() => {
-    const checkConnection = async () => {
-      if (typeof window !== "undefined" && window.ethereum) {
-        const web3 = new Web3(window.ethereum);
-        try {
-          const accounts = await web3.eth.getAccounts();
-          if (accounts.length > 0) {
-            const currentAccount = accounts[0];
-            setAccount(currentAccount);
-            setIsConnected(true);
-            // We still call registerUserWallet to ensure user is in DB,
-            // but primary auth state comes from NextAuth.
-            await registerUserWallet(currentAccount);
-          } else {
-            setIsConnected(false);
-            setAccount(null);
-            setCurrentUser(null);
-          }
-        } catch (error) {
-          console.error("Error checking wallet connection:", error);
-          setIsConnected(false);
-          setAccount(null);
-          setCurrentUser(null);
-        }
-      }
-    };
+    if (sessionStatus === 'loading') {
+      // Still waiting for NextAuth session to resolve
+      // Optionally, you could set isConnected to false here if you want UI to show "Connect"
+      // but it might cause a flicker if session resolves quickly.
+      // For now, let WalletContext retain its state until session is resolved.
+      return;
+    }
 
-    checkConnection();
-    // Consider adding event listener for account changes if not already handled by NextAuth session updates
-    // window.ethereum?.on('accountsChanged', handleAccountsChanged);
-    // return () => window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
-  }, []);
+    if (sessionStatus === 'authenticated' && session?.user) {
+      // User is authenticated via NextAuth
+      const sessionUser = session.user as UserDetails; // Cast to include all our custom fields
+      
+      setAccount(sessionUser.walletAddress);
+      setCurrentUser({
+        id: sessionUser.id,
+        walletAddress: sessionUser.walletAddress,
+        isPremium: sessionUser.isPremium,
+        isAdmin: sessionUser.isAdmin,
+      });
+
+      // Now, check if the physically connected wallet (if any) matches the session
+      // This sets `isConnected` based on physical wallet connection matching the authenticated user.
+      const checkPhysicalWallet = async () => {
+        if (typeof window !== "undefined" && window.ethereum && sessionUser.walletAddress) {
+          const web3 = new Web3(window.ethereum);
+          try {
+            const accounts = await web3.eth.getAccounts();
+            if (accounts.length > 0 && accounts[0].toLowerCase() === sessionUser.walletAddress.toLowerCase()) {
+              setIsConnected(true); // Physically connected wallet matches session
+              console.log("[WalletContext] Physically connected wallet matches NextAuth session.");
+            } else {
+              setIsConnected(false); // No physical match or different account
+              if (accounts.length > 0) {
+                console.warn("[WalletContext] Physically connected wallet does not match NextAuth session wallet.");
+              } else {
+                console.log("[WalletContext] No wallet physically connected to the site.");
+              }
+            }
+          } catch (error) {
+            console.error("[WalletContext] Error checking physical wallet connection:", error);
+            setIsConnected(false);
+          }
+        } else {
+          setIsConnected(false); // No ethereum provider or no walletAddress in session
+        }
+      };
+      checkPhysicalWallet();
+
+    } else { // sessionStatus === 'unauthenticated'
+      // User is not authenticated via NextAuth
+      setIsConnected(false);
+      setAccount(null);
+      setCurrentUser(null);
+      console.log("[WalletContext] NextAuth session unauthenticated, resetting WalletContext.");
+    }
+  }, [sessionStatus, session]); // Re-run when NextAuth session status or data changes
 
   const connect = async (): Promise<string | null> => { // Modified to return account or null
     if (typeof window !== "undefined" && window.ethereum) {

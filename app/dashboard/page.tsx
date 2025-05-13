@@ -48,15 +48,23 @@ export default function DashboardPage() {
     return <div>Loading session...</div>;
   }
 
-  // If user is not authenticated, middleware should have redirected.
-  // If for some reason it didn't, or if we want an explicit in-page prompt:
-  if (!isAuthenticated) {
+  // If user is not authenticated (and session is no longer loading), show LoginModal.
+  // Middleware doesn't protect /dashboard, so this client-side check is important.
+  if (accessSessionStatus === "unauthenticated") {
     // This LoginModal will contain the ConnectButton which now handles NextAuth sign-in
     return (
-      <LoginModal isOpen={true}> {/* isOpen is always true if not authenticated */}
+      <LoginModal isOpen={true}> {/* isOpen is always true if explicitly unauthenticated */}
         <ConnectButton /> {/* ConnectButton is now self-contained */}
       </LoginModal>
     );
+  }
+
+  // If still loading, or if authenticated, proceed to render content (or null if still loading handled above)
+  // If authenticated, the content below will render.
+  if (accessSessionStatus !== "authenticated") {
+    // This case should ideally not be hit if "loading" and "unauthenticated" are handled above.
+    // It's a fallback or if there's another state.
+    return <div>Verifying authentication...</div>; // Or a more appropriate loading/fallback UI
   }
 
   // At this point, user is authenticated.

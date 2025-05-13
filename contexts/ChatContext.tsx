@@ -75,16 +75,21 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Fetch conversations when session status or user's premium status changes
   useEffect(() => {
-    if (!hasMounted) return; // Don't run on server or before client mount
+    if (!hasMounted || sessionStatus === 'loading') {
+      // Do nothing if not mounted or session is still loading
+      return;
+    }
 
     if (sessionStatus === 'authenticated' && session?.user?.isPremium) {
       console.log('[ChatContext] User authenticated and premium, triggering conversation fetch.');
       fetchConversations();
-    } else {
+    } else if (sessionStatus === 'unauthenticated' || (sessionStatus === 'authenticated' && !session?.user?.isPremium)) {
+      // Explicitly handle unauthenticated or authenticated but not premium
       console.log('[ChatContext] User not authenticated or not premium - clearing conversations.');
       setConversations([]);
-      setCurrentConversationId(null); // Clear current conversation if user logs out or loses premium
+      setCurrentConversationId(null); // Clear current conversation
     }
+    // No action needed if sessionStatus is 'loading' due to the check at the beginning of the effect.
   }, [sessionStatus, session, fetchConversations, hasMounted]); // session.user.isPremium is covered by `session` dependency
 
   const selectConversation = (conversationId: string) => {

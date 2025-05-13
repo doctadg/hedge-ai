@@ -4,7 +4,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react" // Import useEffect
 import { signIn, signOut, useSession } from "next-auth/react" // Import NextAuth hooks
 import { useWallet } from "@/contexts/WalletContext" // Import useWallet to access the original connect/disconnect
 
@@ -22,6 +22,10 @@ export function ConnectButton(props: ConnectButtonProps) {
   const walletCtx = useWallet(); // Get full wallet context
 
   const [isProcessing, setIsProcessing] = useState(false); // Generic processing state
+
+  useEffect(() => {
+    console.log("[ConnectButton] Session Status:", sessionStatus, "Session Data:", session);
+  }, [sessionStatus, session]);
 
   const effectiveIsConnected = sessionStatus === "authenticated";
 
